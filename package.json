@@ -1,0 +1,8 @@
+{
+  "name": "elegance-jewelry",
+  "version": "1.0.0",
+  "description": "Elegance Jewelry — Tienda online de joyería",
+  "scripts": {
+    "build": "echo 'Static site - no build needed'"
+  }
+}

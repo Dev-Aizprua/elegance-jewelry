@@ -1,0 +1,88 @@
+/* ============================================================
+   TEMA 1: JOYERÍA — dorado elegante sobre crema ✅ ACTIVO
+   Para cambiar de tema: comenta este bloque y descomenta el Tema 2
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --primary:          #C9A84C;
+  --primary-dark:     #8B6914;
+  --primary-glow:     rgba(201, 168, 76, 0.2);
+  --secondary:        #1C1A16;
+  --secondary-light:  #2A2520;
+  --secondary-mid:    #332E27;
+  --accent:           #E8D48A;
+  --accent-glow:      rgba(232, 212, 138, 0.2);
+  --white:            #FAFAF8;
+  --gray-100:         #F5F0E8;
+  --gray-200:         #EDE8DE;
+  --gray-500:         #8B7355;
+  --gray-800:         #3D3020;
+  --text:             #1C1208;
+  --gradient:         linear-gradient(135deg, #C9A84C 0%, #E8D48A 50%, #C9A84C 100%);
+  --gradient-warm:    linear-gradient(135deg, #C9A84C 0%, #D4AF6A 100%);
+  --card-bg:          #FDFCF9;
+  --card-border:      rgba(201, 168, 76, 0.2);
+  --font-titulo:      'Cormorant Garamond', serif;
+  --font-body:        'Montserrat', sans-serif;
+  --glow-primary:     0 2px 12px rgba(201,168,76,0.25), 0 4px 24px rgba(201,168,76,0.12);
+  --glow-success:     0 2px 8px rgba(46,125,50,0.2);
+  --glow-warning:     0 2px 8px rgba(230,81,0,0.2);
+  --glow-danger:      0 2px 8px rgba(198,40,40,0.2);
+  --success:          #2E7D32;
+  --warning:          #E65100;
+  --danger:           #C62828;
+  --hero-bg:          #1C1A16;
+  --header-bg:        #1C1A16;
+  --spinner-color1:   #C9A84C;
+  --spinner-color2:   #E8D48A;
+  --body-bg:          #F5F0E8;
+  --badge-hot:        linear-gradient(135deg, #C9A84C 0%, #E8D48A 100%);
+  --badge-color:      #1C1A16;
+}
+
+/* ============================================================
+   TEMA 2: GENÉRICO — azul moderno oscuro (comentado)
+   Para activar: comenta el Tema 1 arriba y descomenta este bloque
+   Yesi puede transformar los colores de este tema con un comando
+   ============================================================ */
+/*
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Syne:wght@700;800&display=swap');
+
+:root {
+  --primary:          #00d4ff;
+  --primary-dark:     #00a8cc;
+  --primary-glow:     rgba(0, 212, 255, 0.25);
+  --secondary:        #060e1a;
+  --secondary-light:  #0d1f35;
+  --secondary-mid:    #112440;
+  --accent:           #00ff88;
+  --accent-glow:      rgba(0, 255, 136, 0.2);
+  --white:            #ffffff;
+  --gray-100:         #f0f4f8;
+  --gray-200:         #dde4ee;
+  --gray-500:         #6c7a8f;
+  --gray-800:         #2a3545;
+  --text:             #0d1a2e;
+  --gradient:         linear-gradient(135deg, #00d4ff 0%, #00ff88 100%);
+  --gradient-warm:    linear-gradient(135deg, #00d4ff 0%, #7b5ea7 100%);
+  --card-bg:          #ffffff;
+  --card-border:      #e2eaf5;
+  --font-titulo:      'Syne', sans-serif;
+  --font-body:        'Space Grotesk', sans-serif;
+  --glow-primary:     0 0 20px rgba(0,212,255,0.4), 0 0 40px rgba(0,212,255,0.2);
+  --glow-success:     0 0 20px rgba(0,255,136,0.4);
+  --glow-warning:     0 0 20px rgba(255,184,0,0.4);
+  --glow-danger:      0 0 20px rgba(255,71,87,0.4);
+  --success:          #00ff88;
+  --warning:          #ffb800;
+  --danger:           #ff4757;
+  --hero-bg:          #060e1a;
+  --header-bg:        #060e1a;
+  --spinner-color1:   #00d4ff;
+  --spinner-color2:   #00ff88;
+  --body-bg:          #f0f5fc;
+  --badge-hot:        linear-gradient(135deg, #00d4ff 0%, #00ff88 100%);
+  --badge-color:      #060e1a;
+}
+*/
