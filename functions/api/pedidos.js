@@ -133,11 +133,8 @@ export async function onRequestPost({ request, env }) {
     const idPedido = `EJ-${ts}`;
     const fechaHora = getHoraPanama();
 
-    // Registrar pedido en Sheet (hoja Pedidos)
-    const resumenProductos = productos.map(
-      p => `${p.nombre} (x${p.cantidad}) $${(p.precioFinal * p.cantidad).toFixed(2)}`
-    ).join(' | ');
-
+    // Registrar en hoja Pedidos
+    // Orden: Fecha, ID Pedido, Cliente, Email, Teléfono, Dirección, Subtotal, ITBMS, Total, Estado
     await fetch(
       `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Pedidos!A:J:append?valueInputOption=USER_ENTERED`,
       {
@@ -145,18 +142,41 @@ export async function onRequestPost({ request, env }) {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           values: [[
-            idPedido,
             fechaHora,
+            idPedido,
             cliente.nombre,
             cliente.email,
             cliente.telefono,
             cliente.direccion,
-            resumenProductos,
             subtotal.toFixed(2),
             itbmsTotal.toFixed(2),
-            total.toFixed(2)
+            total.toFixed(2),
+            'Pendiente'
           ]]
         })
+      }
+    );
+
+    // Registrar en hoja DetallePedidos — una fila por producto
+    // Orden: ID Pedido, ID Producto, Nombre Producto, Cantidad, Precio Base, ITBMS%, ITBMS Monto, Precio Final, Subtotal
+    const filasDetal = productos.map(p => [
+      idPedido,
+      p.id,
+      p.nombre,
+      p.cantidad,
+      p.precioBase.toFixed(2),
+      p.itbmsPorc,
+      p.itbmsMonto.toFixed(2),
+      p.precioFinal.toFixed(2),
+      (p.precioFinal * p.cantidad).toFixed(2)
+    ]);
+
+    await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/DetallePedidos!A:I:append?valueInputOption=USER_ENTERED`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ values: filasDetal })
       }
     );
 
