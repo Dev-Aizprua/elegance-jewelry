@@ -61,11 +61,10 @@ async function getAccessToken(credentials) {
 }
 
 function getHoraPanama() {
-  return new Date().toLocaleString('es-PA', {
-    timeZone: 'America/Panama',
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit'
-  });
+  const ahora = new Date();
+  const panamaOffset = -5 * 60;
+  const panamaTime = new Date(ahora.getTime() + (ahora.getTimezoneOffset() + panamaOffset) * 60000);
+  return `${String(panamaTime.getMonth()+1).padStart(2,'0')}/${String(panamaTime.getDate()).padStart(2,'0')}/${panamaTime.getFullYear()}`;
 }
 
 export async function onRequestPost({ request, env }) {
