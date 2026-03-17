@@ -2,6 +2,10 @@
 // app.js — Lógica de la tienda (NO editar)
 // ============================================================
 
+function fmt(n) {
+  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 let productos = [];
 let carrito = [];
 let ultimoPedido = null;
@@ -88,7 +92,7 @@ function mostrarProductos() {
         '<div class="producto-descripcion">' + p.descripcion + '</div>' +
         '<div class="producto-footer">' +
           '<div class="producto-precio-container">' +
-            '<div class="producto-precio">' + (agotado ? '<span class="precio-agotado">$' + p.precioFinal.toFixed(2) + '</span>' : '$' + p.precioFinal.toFixed(2)) + '</div>' +
+            '<div class="producto-precio">' + (agotado ? '<span class="precio-agotado">$' + fmt(p.precioFinal) + '</span>' : '$' + fmt(p.precioFinal)) + '</div>' +
             '<div class="producto-precio-detalle">' + (p.itbmsPorc > 0 ? 'Incluye ITBMS ' + p.itbmsPorc + '%' : 'Exento de ITBMS') + '</div>' +
             '<div class="producto-stock' + stockClass + '">' +
               (agotado ? '❌ AGOTADO' : (stockBajo ? '🔥 ¡Solo ' + p.stock + '!' : '✓ Stock: ' + p.stock)) +
@@ -215,7 +219,7 @@ function mostrarCarrito() {
         '<img src="' + item.imagen + '" class="carrito-item-img" onerror="this.src=\'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2280%22 height=%2280%22%3E%3Crect fill=%22%23f5f0e8%22 width=%2280%22 height=%2280%22/%3E%3C/svg%3E\'">' +
         '<div class="carrito-item-info">' +
           '<div class="carrito-item-nombre">' + item.nombre + '</div>' +
-          '<div class="carrito-item-precio">$' + item.precioBase.toFixed(2) + ' c/u' +
+          '<div class="carrito-item-precio">$' + fmt(item.precioBase) + ' c/u' +
             (item.itbmsPorc > 0 ? '<br><small style="color:var(--gray-500);">+ ITBMS ' + item.itbmsPorc + '%</small>' : '') + '</div>' +
           '<div class="carrito-item-controls">' +
             '<button class="qty-btn" onclick="cambiarCantidad(' + idx + ',-1)">−</button>' +
@@ -227,9 +231,9 @@ function mostrarCarrito() {
       '</div>'
     ).join('') + '</div>' +
     '<div class="carrito-total">' +
-      '<div class="carrito-total-row"><span>Subtotal:</span><span>$' + subtotal.toFixed(2) + '</span></div>' +
-      '<div class="carrito-total-row" style="color:var(--gray-500);"><span>ITBMS:</span><span>$' + totalITBMS.toFixed(2) + '</span></div>' +
-      '<div class="carrito-total-row total"><span>Total:</span><span>$' + total.toFixed(2) + '</span></div>' +
+      '<div class="carrito-total-row"><span>Subtotal:</span><span>$' + fmt(subtotal) + '</span></div>' +
+      '<div class="carrito-total-row" style="color:var(--gray-500);"><span>ITBMS:</span><span>$' + fmt(totalITBMS) + '</span></div>' +
+      '<div class="carrito-total-row total"><span>Total:</span><span>$' + fmt(total) + '</span></div>' +
     '</div>' +
     '<button class="btn-checkout" onclick="irACheckout()">Proceder al Pago →</button>';
 }
@@ -262,15 +266,15 @@ function irACheckout() {
     carrito.map(item =>
       '<div class="resumen-item">' +
         '<div class="resumen-item-header"><span>' + item.nombre + ' (x' + item.cantidad + ')</span>' +
-        '<span>$' + (item.precioFinal * item.cantidad).toFixed(2) + '</span></div>' +
-        '<div class="resumen-item-detail">Base: $' + (item.precioBase * item.cantidad).toFixed(2) +
-        (item.itbmsPorc > 0 ? ' | ITBMS: $' + (item.itbmsMonto * item.cantidad).toFixed(2) : ' | Exento') + '</div>' +
+        '<span>$' + fmt(item.precioFinal * item.cantidad) + '</span></div>' +
+        '<div class="resumen-item-detail">Base: $' + fmt(item.precioBase * item.cantidad) +
+        (item.itbmsPorc > 0 ? ' | ITBMS: $' + fmt(item.itbmsMonto * item.cantidad) : ' | Exento') + '</div>' +
       '</div>'
     ).join('') +
     '<div class="resumen-totales">' +
-      '<div class="resumen-row"><span>Subtotal:</span><span>$' + subtotal.toFixed(2) + '</span></div>' +
-      '<div class="resumen-row" style="color:var(--gray-500);"><span>ITBMS:</span><span>$' + totalITBMS.toFixed(2) + '</span></div>' +
-      '<div class="resumen-row total"><span>Total:</span><span>$' + total.toFixed(2) + '</span></div>' +
+      '<div class="resumen-row"><span>Subtotal:</span><span>$' + fmt(subtotal) + '</span></div>' +
+      '<div class="resumen-row" style="color:var(--gray-500);"><span>ITBMS:</span><span>$' + fmt(totalITBMS) + '</span></div>' +
+      '<div class="resumen-row total"><span>Total:</span><span>$' + fmt(total) + '</span></div>' +
     '</div></div>' +
     '<form id="checkoutForm" onsubmit="finalizarCompra(event)">' +
       '<div class="form-group"><label>Nombre Completo *</label>' +
@@ -354,12 +358,12 @@ function generarMensajeWhatsApp() {
     '\n\nDireccion:\n' + ultimoPedido.cliente.direccion +
     '\n\n--- Productos ---\n';
   ultimoPedido.productos.forEach(i => {
-    msg += '* ' + i.nombre + ' (x' + i.cantidad + ') - $' + (i.precioFinal * i.cantidad).toFixed(2) + '\n';
+    msg += '* ' + i.nombre + ' (x' + i.cantidad + ') - $' + fmt(i.precioFinal * i.cantidad) + '\n';
   });
   msg += '\n---------------------------' +
-    '\nSubtotal: $' + subtotal.toFixed(2) +
-    '\nITBMS: $' + totalITBMS.toFixed(2) +
-    '\nTOTAL: $' + total.toFixed(2) +
+    '\nSubtotal: $' + fmt(subtotal) +
+    '\nITBMS: $' + fmt(totalITBMS) +
+    '\nTOTAL: $' + fmt(total) +
     '\n---------------------------\n\n' + EMPRESA.nombre + ' - ' + EMPRESA.slogan;
   return codificarTextoWhatsApp(msg);
 }
