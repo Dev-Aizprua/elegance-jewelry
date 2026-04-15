@@ -1,205 +1,145 @@
-// functions/api/pedidos.js — Cloudflare Pages Function
-// Elegance Jewelry
+// functions/api/pedidos.js
+// Registra pedidos en Cloudflare D1
 
-const DOMINIOS_PERMITIDOS = [
-  'https://elegance-jewelry.pages.dev',
-  'http://localhost:3000'
-];
+export async function onRequestPost(context) {
+  const { request, env } = context;
 
-function getCORSHeaders(request) {
-  const origin = request.headers.get('Origin') || '';
-  const allowed = DOMINIOS_PERMITIDOS.includes(origin) ? origin : '*';
-  return {
-    'Access-Control-Allow-Origin': allowed,
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type'
-  };
-}
-
-const toBase64url = (str) =>
-  btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-
-async function getAccessToken(credentials) {
-  const now = Math.floor(Date.now() / 1000);
-  const header  = toBase64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
-  const payload = toBase64url(JSON.stringify({
-    iss: credentials.client_email,
-    scope: 'https://www.googleapis.com/auth/spreadsheets',
-    aud: 'https://oauth2.googleapis.com/token',
-    exp: now + 3600, iat: now
-  }));
-  const signingInput = `${header}.${payload}`;
-  const pemKey = credentials.private_key
-    .replace('-----BEGIN PRIVATE KEY-----', '')
-    .replace('-----END PRIVATE KEY-----', '')
-    .replace(/\s/g, '');
-  const binaryStr = atob(pemKey);
-  const keyData = new Uint8Array(binaryStr.length);
-  for (let i = 0; i < binaryStr.length; i++) keyData[i] = binaryStr.charCodeAt(i);
-  const cryptoKey = await crypto.subtle.importKey(
-    'pkcs8', keyData.buffer,
-    { name: 'RSASSA-PKCS1-v1_5', hash: { name: 'SHA-256' } },
-    false, ['sign']
-  );
-  const signatureBuffer = await crypto.subtle.sign(
-    { name: 'RSASSA-PKCS1-v1_5' }, cryptoKey,
-    new TextEncoder().encode(signingInput)
-  );
-  const sigArray = new Uint8Array(signatureBuffer);
-  let sigStr = '';
-  for (let i = 0; i < sigArray.length; i++) sigStr += String.fromCharCode(sigArray[i]);
-  const signature = btoa(sigStr).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-  const jwt = `${signingInput}.${signature}`;
-  const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`
-  });
-  const tokenData = await tokenRes.json();
-  if (!tokenData.access_token) throw new Error(`Token error: ${JSON.stringify(tokenData)}`);
-  return tokenData.access_token;
-}
-
-function getHoraPanama() {
-  const ahora = new Date();
-  const panamaOffset = -5 * 60;
-  const panamaTime = new Date(ahora.getTime() + (ahora.getTimezoneOffset() + panamaOffset) * 60000);
-  return `${String(panamaTime.getMonth()+1).padStart(2,'0')}/${String(panamaTime.getDate()).padStart(2,'0')}/${panamaTime.getFullYear()}`;
-}
-
-export async function onRequestPost({ request, env }) {
-  const corsHeaders = getCORSHeaders(request);
   try {
     const body = await request.json();
-    const { cliente, productos } = body;
+    const { cliente, items } = body;
 
-    if (!cliente?.nombre || !cliente?.email || !cliente?.telefono || !cliente?.direccion) {
+    // Validar que vengan datos
+    if (!cliente || !items || items.length === 0) {
       return new Response(
-        JSON.stringify({ success: false, error: 'Datos del cliente incompletos' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    if (!productos || productos.length === 0) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'No hay productos en el pedido' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'Datos incompletos' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    const credentials = JSON.parse(env.GOOGLE_CREDENTIALS);
-    const token = await getAccessToken(credentials);
-    const SHEET_ID = env.SHEET_ID;
+    // Verificar stock de cada producto antes de procesar
+    for (const item of items) {
+      const prod = await env.elegance_db
+        .prepare('SELECT stock FROM productos WHERE id = ? AND activo = 1')
+        .bind(item.id)
+        .first();
 
-    // Verificar y descontar stock
-    const stockUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Productos!A2:K100`;
-    const stockRes = await fetch(stockUrl, { headers: { Authorization: `Bearer ${token}` } });
-    const stockData = await stockRes.json();
-    const filas = stockData.values || [];
-
-    const actualizaciones = [];
-    for (const item of productos) {
-      const idx = filas.findIndex(f => f[0] === item.id);
-      if (idx === -1) throw new Error(`Producto no encontrado: ${item.id}`);
-      const stockActual = parseInt(filas[idx][6]) || 0;
-      if (stockActual < item.cantidad) {
-        throw new Error(`AGOTADO: "${item.nombre}" solo tiene ${stockActual} disponible`);
+      if (!prod) {
+        return new Response(
+          JSON.stringify({ error: `Producto ${item.id} no encontrado` }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
       }
-      actualizaciones.push({ fila: idx + 2, nuevoStock: stockActual - item.cantidad });
+      if (prod.stock < item.cantidad) {
+        return new Response(
+          JSON.stringify({ error: `Stock insuficiente para ${item.nombre}` }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
-    // Descontar stock
-    for (const act of actualizaciones) {
-      await fetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Productos!G${act.fila}?valueInputOption=RAW`,
-        {
-          method: 'PUT',
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ values: [[act.nuevoStock]] })
-        }
-      );
-    }
+    // Generar ID de pedido con prefijo EJ-
+    const ts = Date.now();
+    const idPedido = `EJ-${ts}`;
+    const fecha = new Date().toLocaleDateString('en-US'); // MM/DD/YYYY
 
     // Calcular totales
-    let subtotal = 0, itbmsTotal = 0;
-    productos.forEach(item => {
-      subtotal    += item.precioBase  * item.cantidad;
-      itbmsTotal  += item.itbmsMonto  * item.cantidad;
+    let subtotal = 0;
+    let itbmsTotal = 0;
+
+    const detalles = items.map(item => {
+      const precioBase  = parseFloat(item.precio_base);
+      const itbmsPct    = parseFloat(item.itbms_pct) || 0;
+      const itbmsMonto  = parseFloat(((precioBase * itbmsPct) / 100).toFixed(2));
+      const precioFinal = parseFloat((precioBase + itbmsMonto).toFixed(2));
+      const subItem     = parseFloat((precioFinal * item.cantidad).toFixed(2));
+
+      subtotal   += parseFloat((precioBase * item.cantidad).toFixed(2));
+      itbmsTotal += parseFloat((itbmsMonto * item.cantidad).toFixed(2));
+
+      return {
+        id_pedido:       idPedido,
+        id_producto:     item.id,
+        nombre_producto: item.nombre,
+        cantidad:        item.cantidad,
+        precio_base:     precioBase,
+        itbms_pct:       itbmsPct,
+        itbms_monto:     itbmsMonto,
+        precio_final:    precioFinal,
+        subtotal:        subItem,
+      };
     });
-    const total = subtotal + itbmsTotal;
 
-    // Generar ID pedido — EJ- para Elegance Jewelry
-    const ts = Date.now().toString().slice(-6);
-    const idPedido = `EJ-${ts}`;
-    const fechaHora = getHoraPanama();
+    const total = parseFloat((subtotal + itbmsTotal).toFixed(2));
 
-    // Registrar en hoja Pedidos
-    // Orden: Fecha, ID Pedido, Cliente, Email, Teléfono, Dirección, Subtotal, ITBMS, Total, Estado
-    await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Pedidos!A:J:append?valueInputOption=USER_ENTERED`,
-      {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          values: [[
-            fechaHora,
-            idPedido,
-            cliente.nombre,
-            cliente.email,
-            cliente.telefono,
-            cliente.direccion,
-            subtotal.toFixed(2),
-            itbmsTotal.toFixed(2),
-            total.toFixed(2),
-            'Pendiente'
-          ]]
-        })
-      }
+    // Insertar pedido + detalles + descontar stock en una sola transacción
+    const stmts = [];
+
+    // Insertar pedido principal
+    stmts.push(
+      env.elegance_db
+        .prepare(`
+          INSERT INTO pedidos
+            (id_pedido, fecha, cliente_nombre, cliente_email, cliente_tel, direccion,
+             subtotal, itbms_total, total, estado)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pendiente')
+        `)
+        .bind(
+          idPedido, fecha,
+          cliente.nombre, cliente.email, cliente.telefono, cliente.direccion,
+          subtotal, itbmsTotal, total
+        )
     );
 
-    // Registrar en hoja DetallePedidos — una fila por producto
-    // Orden: ID Pedido, ID Producto, Nombre Producto, Cantidad, Precio Base, ITBMS%, ITBMS Monto, Precio Final, Subtotal
-    const filasDetal = productos.map(p => [
-      idPedido,
-      p.id,
-      p.nombre,
-      p.cantidad,
-      p.precioBase.toFixed(2),
-      p.itbmsPorc,
-      p.itbmsMonto.toFixed(2),
-      p.precioFinal.toFixed(2),
-      (p.precioFinal * p.cantidad).toFixed(2)
-    ]);
+    // Insertar cada línea de detalle y descontar stock
+    for (const d of detalles) {
+      stmts.push(
+        env.elegance_db
+          .prepare(`
+            INSERT INTO detalle_pedidos
+              (id_pedido, id_producto, nombre_producto, cantidad,
+               precio_base, itbms_pct, itbms_monto, precio_final, subtotal)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `)
+          .bind(
+            d.id_pedido, d.id_producto, d.nombre_producto, d.cantidad,
+            d.precio_base, d.itbms_pct, d.itbms_monto, d.precio_final, d.subtotal
+          )
+      );
 
-    await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/DetallePedidos!A:I:append?valueInputOption=USER_ENTERED`,
-      {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ values: filasDetal })
-      }
-    );
+      stmts.push(
+        env.elegance_db
+          .prepare('UPDATE productos SET stock = stock - ? WHERE id = ?')
+          .bind(d.cantidad, d.id_producto)
+      );
+    }
+
+    // Ejecutar todo como batch atómico
+    await env.elegance_db.batch(stmts);
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        pedido: {
-          id: idPedido,
-          fecha: fechaHora,
-          subtotal: parseFloat(subtotal.toFixed(2)),
-          itbms:    parseFloat(itbmsTotal.toFixed(2)),
-          total:    parseFloat(total.toFixed(2))
-        }
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ ok: true, id_pedido: idPedido, total }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+      }
     );
-  } catch (error) {
+  } catch (err) {
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: 'Error al registrar pedido', detalle: err.message }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
 }
 
-export async function onRequestOptions({ request }) {
-  return new Response(null, { status: 200, headers: getCORSHeaders(request) });
+export async function onRequestOptions() {
+  return new Response(null, {
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  });
 }

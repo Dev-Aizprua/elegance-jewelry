@@ -5,3 +5,8 @@ compatibility_flags = ["nodejs_compat"]
 
 [vars]
 SHEET_ID = "1LQzHEEKU4rQTg8VxoJHpg0dwwOqq2qmx_mfyz1HFaaA"
+
+[[d1_databases]]
+binding = "elegance_db"
+database_name = "elegance-db"
+database_id = "9fb83205-8ad8-4473-a7da-0de3aaeaa2a0"
