@@ -1,5 +1,6 @@
 // functions/api/pedidos.js
 // Registra pedidos en Cloudflare D1
+// Compatible con los nombres que envía app.js
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -8,7 +9,6 @@ export async function onRequestPost(context) {
     const body = await request.json();
     const { cliente, items } = body;
 
-    // Validar que vengan datos
     if (!cliente || !items || items.length === 0) {
       return new Response(
         JSON.stringify({ error: 'Datos incompletos' }),
@@ -16,7 +16,7 @@ export async function onRequestPost(context) {
       );
     }
 
-    // Verificar stock de cada producto antes de procesar
+    // Verificar stock antes de procesar
     for (const item of items) {
       const prod = await env.elegance_db
         .prepare('SELECT stock FROM productos WHERE id = ? AND activo = 1')
@@ -25,32 +25,33 @@ export async function onRequestPost(context) {
 
       if (!prod) {
         return new Response(
-          JSON.stringify({ error: `Producto ${item.id} no encontrado` }),
+          JSON.stringify({ success: false, error: `Producto ${item.id} no encontrado` }),
           { status: 400, headers: { 'Content-Type': 'application/json' } }
         );
       }
       if (prod.stock < item.cantidad) {
         return new Response(
-          JSON.stringify({ error: `Stock insuficiente para ${item.nombre}` }),
+          JSON.stringify({ success: false, error: `Stock insuficiente para ${item.nombre}. Disponible: ${prod.stock}` }),
           { status: 400, headers: { 'Content-Type': 'application/json' } }
         );
       }
     }
 
-    // Generar ID de pedido con prefijo EJ-
-    const ts = Date.now();
+    // Generar ID y fecha
+    const ts       = Date.now();
     const idPedido = `EJ-${ts}`;
-    const fecha = new Date().toLocaleDateString('en-US'); // MM/DD/YYYY
+    const fecha    = new Date().toLocaleDateString('en-US'); // MM/DD/YYYY
 
-    // Calcular totales
-    let subtotal = 0;
+    // Calcular totales — compatible con ambos formatos de nombres
+    let subtotal   = 0;
     let itbmsTotal = 0;
 
     const detalles = items.map(item => {
-      const precioBase  = parseFloat(item.precio_base);
-      const itbmsPct    = parseFloat(item.itbms_pct) || 0;
-      const itbmsMonto  = parseFloat(((precioBase * itbmsPct) / 100).toFixed(2));
-      const precioFinal = parseFloat((precioBase + itbmsMonto).toFixed(2));
+      // app.js puede mandar precioBase o precio_base, itbmsPorc o itbms_pct
+      const precioBase  = parseFloat(item.precioBase  ?? item.precio_base  ?? 0);
+      const itbmsPct    = parseFloat(item.itbmsPorc   ?? item.itbms_pct    ?? 0);
+      const itbmsMonto  = parseFloat(item.itbmsMonto  ?? ((precioBase * itbmsPct) / 100));
+      const precioFinal = parseFloat(item.precioFinal ?? (precioBase + itbmsMonto));
       const subItem     = parseFloat((precioFinal * item.cantidad).toFixed(2));
 
       subtotal   += parseFloat((precioBase * item.cantidad).toFixed(2));
@@ -63,34 +64,36 @@ export async function onRequestPost(context) {
         cantidad:        item.cantidad,
         precio_base:     precioBase,
         itbms_pct:       itbmsPct,
-        itbms_monto:     itbmsMonto,
-        precio_final:    precioFinal,
+        itbms_monto:     parseFloat(itbmsMonto.toFixed(2)),
+        precio_final:    parseFloat(precioFinal.toFixed(2)),
         subtotal:        subItem,
       };
     });
 
     const total = parseFloat((subtotal + itbmsTotal).toFixed(2));
 
-    // Insertar pedido + detalles + descontar stock en una sola transacción
+    // Batch atómico: pedido + detalles + descuento de stock
     const stmts = [];
 
-    // Insertar pedido principal
     stmts.push(
       env.elegance_db
         .prepare(`
           INSERT INTO pedidos
-            (id_pedido, fecha, cliente_nombre, cliente_email, cliente_tel, direccion,
-             subtotal, itbms_total, total, estado)
+            (id_pedido, fecha, cliente_nombre, cliente_email, cliente_tel,
+             direccion, subtotal, itbms_total, total, estado)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pendiente')
         `)
         .bind(
           idPedido, fecha,
-          cliente.nombre, cliente.email, cliente.telefono, cliente.direccion,
-          subtotal, itbmsTotal, total
+          cliente.nombre, cliente.email,
+          cliente.telefono || cliente.tel || '',
+          cliente.direccion || '',
+          parseFloat(subtotal.toFixed(2)),
+          parseFloat(itbmsTotal.toFixed(2)),
+          total
         )
     );
 
-    // Insertar cada línea de detalle y descontar stock
     for (const d of detalles) {
       stmts.push(
         env.elegance_db
@@ -113,11 +116,19 @@ export async function onRequestPost(context) {
       );
     }
 
-    // Ejecutar todo como batch atómico
     await env.elegance_db.batch(stmts);
 
+    // Respuesta en formato que espera app.js
     return new Response(
-      JSON.stringify({ ok: true, id_pedido: idPedido, total }),
+      JSON.stringify({
+        success: true,
+        id_pedido: idPedido,
+        pedido: {
+          idPedido,
+          total,
+          itbms: parseFloat(itbmsTotal.toFixed(2)),
+        }
+      }),
       {
         status: 200,
         headers: {
@@ -128,7 +139,7 @@ export async function onRequestPost(context) {
     );
   } catch (err) {
     return new Response(
-      JSON.stringify({ error: 'Error al registrar pedido', detalle: err.message }),
+      JSON.stringify({ success: false, error: err.message }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
