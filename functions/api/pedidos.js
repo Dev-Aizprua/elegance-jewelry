@@ -1,23 +1,32 @@
 // functions/api/pedidos.js
 // Registra pedidos en Cloudflare D1
-// Compatible con los nombres que envía app.js
+// CORRECCIÓN: Ahora acepta 'items' o 'productos' para evitar el error 400
 
 export async function onRequestPost(context) {
   const { request, env } = context;
 
   try {
     const body = await request.json();
-    const { cliente, items } = body;
+    
+    // EXTRAEMOS AMBOS POSIBLES NOMBRES
+    const { cliente, items, productos } = body;
+    
+    // USAMOS EL QUE NO VENGA VACÍO
+    const listaArticulos = items || productos;
 
-    if (!cliente || !items || items.length === 0) {
+    // VALIDACIÓN MEJORADA
+    if (!cliente || !listaArticulos || listaArticulos.length === 0) {
       return new Response(
-        JSON.stringify({ error: 'Datos incompletos' }),
+        JSON.stringify({ 
+            error: 'Datos incompletos', 
+            detalle: 'Se esperaba "items" o "productos" y "cliente"' 
+        }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    // Verificar stock antes de procesar
-    for (const item of items) {
+    // Verificar stock antes de procesar usando el binding 'elegance_db'
+    for (const item of listaArticulos) {
       const prod = await env.elegance_db
         .prepare('SELECT stock FROM productos WHERE id = ? AND activo = 1')
         .bind(item.id)
@@ -40,14 +49,13 @@ export async function onRequestPost(context) {
     // Generar ID y fecha
     const ts       = Date.now();
     const idPedido = `EJ-${ts}`;
-    const fecha    = new Date().toLocaleDateString('en-US'); // MM/DD/YYYY
+    const fecha    = new Date().toLocaleDateString('en-US'); 
 
-    // Calcular totales — compatible con ambos formatos de nombres
+    // Calcular totales
     let subtotal   = 0;
     let itbmsTotal = 0;
 
-    const detalles = items.map(item => {
-      // app.js puede mandar precioBase o precio_base, itbmsPorc o itbms_pct
+    const detalles = listaArticulos.map(item => {
       const precioBase  = parseFloat(item.precioBase  ?? item.precio_base  ?? 0);
       const itbmsPct    = parseFloat(item.itbmsPorc   ?? item.itbms_pct    ?? 0);
       const itbmsMonto  = parseFloat(item.itbmsMonto  ?? ((precioBase * itbmsPct) / 100));
@@ -72,9 +80,9 @@ export async function onRequestPost(context) {
 
     const total = parseFloat((subtotal + itbmsTotal).toFixed(2));
 
-    // Batch atómico: pedido + detalles + descuento de stock
     const stmts = [];
 
+    // Insertar Pedido Principal
     stmts.push(
       env.elegance_db
         .prepare(`
@@ -94,6 +102,7 @@ export async function onRequestPost(context) {
         )
     );
 
+    // Insertar detalles y actualizar stock
     for (const d of detalles) {
       stmts.push(
         env.elegance_db
@@ -118,16 +127,11 @@ export async function onRequestPost(context) {
 
     await env.elegance_db.batch(stmts);
 
-    // Respuesta en formato que espera app.js
     return new Response(
       JSON.stringify({
         success: true,
         id_pedido: idPedido,
-        pedido: {
-          idPedido,
-          total,
-          itbms: parseFloat(itbmsTotal.toFixed(2)),
-        }
+        pedido: { idPedido, total, itbms: parseFloat(itbmsTotal.toFixed(2)) }
       }),
       {
         status: 200,
