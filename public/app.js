@@ -29,9 +29,10 @@ window.onload = function() {
   document.getElementById('footerSlogan').textContent = EMPRESA.slogan;
   document.getElementById('footerDireccion').textContent = EMPRESA.direccion;
   document.getElementById('footerTelefono').textContent = EMPRESA.telefono;
+  // Botón flotante → Kairós (agente de ventas)
   document.getElementById('whatsappFloat').href =
-    'https://wa.me/' + EMPRESA.whatsapp + '?text=' +
-    encodeURIComponent('Hola, estoy interesado en sus productos');
+    'https://wa.me/50760164559?text=' +
+    encodeURIComponent('Hola Kairós, necesito ayuda');
 
   if (EMPRESA.logo) {
     const logoImg = document.getElementById('logoImg');
