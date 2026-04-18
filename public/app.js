@@ -32,7 +32,7 @@ window.onload = function() {
   // Botón flotante → Kairós (agente de ventas)
   document.getElementById('whatsappFloat').href =
     'https://wa.me/50760164559?text=' +
-    encodeURIComponent('Hola Kairós, necesito ayuda');
+    encodeURIComponent('Hola Kairós, estoy viendo la demo de ELEGANCIA JOYERÍA y quiero ver el panel de control.');
 
   if (EMPRESA.logo) {
     const logoImg = document.getElementById('logoImg');
