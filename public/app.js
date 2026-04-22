@@ -333,6 +333,11 @@ async function finalizarCompra(event) {
     resultado = await response.json();
     if (!resultado.success) throw new Error(resultado.error || 'Error al procesar');
 
+    // Normalizar respuesta — total puede estar en raíz o dentro de resultado.pedido
+    const _total    = parseFloat(resultado.total    ?? resultado.pedido?.total    ?? 0);
+    const _subtotal = parseFloat(resultado.subtotal ?? resultado.pedido?.subtotal ?? 0);
+    const _itbms    = parseFloat(resultado.itbms    ?? resultado.pedido?.itbms    ?? 0);
+
     // Guardar en ultimoPedido para WhatsApp
     ultimoPedido = {
       id:         resultado.id_pedido,
@@ -340,11 +345,11 @@ async function finalizarCompra(event) {
       url_pedido: resultado.url_seguimiento,
       cliente:    datosCliente,
       productos:  [...carrito],
-      fecha:      (() => { try { return new Date().toLocaleDateString('es-419', { weekday:'long', year:'numeric', month:'long', day:'numeric' }); } catch(e) { return new Date().toLocaleDateString(); } })(),
-      hora:       (() => { try { return new Date().toLocaleTimeString('es-419', { hour:'2-digit', minute:'2-digit' }); } catch(e) { return new Date().toLocaleTimeString(); } })(),
-      total:      resultado.total,
-      subtotal:   resultado.subtotal,
-      itbms:      resultado.itbms
+      fecha:      new Date().toLocaleDateString('es-419', { weekday:'long', year:'numeric', month:'long', day:'numeric' }),
+      hora:       new Date().toLocaleTimeString('es-419', { hour:'2-digit', minute:'2-digit' }),
+      total:      _total,
+      subtotal:   _subtotal,
+      itbms:      _itbms
     };
 
     carrito = [];
@@ -426,9 +431,10 @@ function mostrarExitoBasico(resultado) {
 
 // ── Pantalla de pago post-checkout ── ★ NUEVA ──────────────
 function mostrarPantallaPago(pedido) {
-  const idPedido    = pedido.id_pedido  || '';
-  const token       = pedido.token      || '';
-  const total       = parseFloat(pedido.total || 0);
+  // El servidor devuelve total dentro de pedido.pedido — leer de ambos lugares
+  const idPedido    = pedido.id_pedido || '';
+  const token       = pedido.token || '';
+  const total       = parseFloat(pedido.total ?? pedido.pedido?.total ?? 0);
   const urlCompleta = pedido.url_seguimiento || (window.location.origin + '/pedido?id=' + idPedido + '&key=' + token);
 
   document.getElementById('carritoBody').innerHTML =
