@@ -301,20 +301,23 @@ async function finalizarCompra(event) {
   event.preventDefault();
   const form = event.target;
   const datosCliente = {
-    nombre:   form.nombre.value,
-    email:    form.email.value,
-    telefono: form.telefono.value,
+    nombre:    form.nombre.value,
+    email:     form.email.value,
+    telefono:  form.telefono.value,
     direccion: form.direccion.value
   };
+  // Guardar referencia al botón ANTES de cualquier operación asíncrona
   const btnSubmit = form.querySelector('button[type="submit"]');
-  btnSubmit.disabled = true;
-  btnSubmit.textContent = 'Procesando...';
+  if (btnSubmit) { btnSubmit.disabled = true; btnSubmit.textContent = 'Procesando...'; }
+
+  let resultado = null;
+
   try {
     const response = await fetch('/api/pedidos', {
-      method: 'POST',
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        cliente: datosCliente,
+        cliente:   datosCliente,
         productos: carrito.map(item => ({
           id:          item.id,
           nombre:      item.nombre,
@@ -326,10 +329,11 @@ async function finalizarCompra(event) {
         }))
       })
     });
-    const resultado = await response.json();
+
+    resultado = await response.json();
     if (!resultado.success) throw new Error(resultado.error || 'Error al procesar');
 
-    // ★ El nuevo pedidos.js devuelve token y url_seguimiento
+    // Guardar en ultimoPedido para WhatsApp
     ultimoPedido = {
       id:         resultado.id_pedido,
       token:      resultado.token,
@@ -343,40 +347,81 @@ async function finalizarCompra(event) {
       itbms:      resultado.itbms
     };
 
-    // Mostrar pantalla de éxito — try/catch propio para no perder la confirmación
-    try {
-      mostrarPantallaPago(resultado);
-    } catch (displayError) {
-      console.error('Error en pantalla de pago:', displayError);
-      // Pantalla de éxito de emergencia si mostrarPantallaPago falla
-      document.getElementById('carritoBody').innerHTML =
-        '<div class="success-message">' +
-          '<div class="success-icon">✅</div>' +
-          '<h3>¡PEDIDO REGISTRADO!</h3>' +
-          '<div class="pedido-id">#' + (resultado.id_pedido || '') + '</div>' +
-          '<p style="color:var(--gray-500);font-size:13px;margin-top:8px;">Tu mercancía quedó reservada.<br>' +
-          'Total: $' + (resultado.total || '0.00') + '</p>' +
-        '</div>' +
-        '<div class="whatsapp-section">' +
-          '<h4>📱 Enviar Comprobante</h4>' +
-          '<p>Guarda este enlace para ver tu pedido:</p>' +
-          '<p style="word-break:break-all;font-size:11px;color:var(--primary);">' + (resultado.url_seguimiento || '') + '</p>' +
-        '</div>' +
-        '<button class="btn-checkout" onclick="seguirComprando()">Seguir Comprando</button>';
-    }
     carrito = [];
     actualizarContadorCarrito();
-  } catch (error) {
-    console.error('❌ Error en finalizarCompra:', error);
-    console.error('Stack:', error.stack);
-    if (error.message.includes('AGOTADO') || error.message.includes('disponible')) {
-      alert('⚠️ Error de stock:\n\n' + error.message);
-    } else {
-      alert('❌ Error al procesar el pedido:\n\n' + error.message + '\n\n(Ver consola para detalles)');
+
+    // Mostrar pantalla de pago — si falla por cualquier razón, mostrar pantalla básica
+    try {
+      mostrarPantallaPago(resultado);
+    } catch (displayErr) {
+      console.error('Error en mostrarPantallaPago:', displayErr);
+      mostrarExitoBasico(resultado);
     }
-    btnSubmit.disabled = false;
-    btnSubmit.textContent = 'Finalizar Compra';
+
+  } catch (error) {
+    console.error('Error en finalizarCompra:', error);
+    // Si el pedido YA se creó (resultado existe) pero falló algo después → mostrar éxito igual
+    if (resultado && resultado.success) {
+      carrito = [];
+      actualizarContadorCarrito();
+      mostrarExitoBasico(resultado);
+      return;
+    }
+    // Si el pedido NO se creó → mostrar error
+    const msg = error.message || 'Error desconocido';
+    if (msg.includes('AGOTADO') || msg.includes('disponible') || msg.includes('stock')) {
+      alert('⚠️ Error de stock:\n\n' + msg);
+    } else {
+      alert('❌ Error al procesar el pedido:\n\n' + msg);
+    }
+    if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.textContent = 'Finalizar Compra'; }
   }
+}
+
+// Pantalla de éxito básica de emergencia — siempre funciona
+function mostrarExitoBasico(resultado) {
+  const idPedido = resultado.id_pedido || '';
+  const total    = resultado.total || 0;
+  const urlSeg   = resultado.url_seguimiento || '';
+  document.getElementById('carritoBody').innerHTML =
+    '<div class="success-message">' +
+      '<div class="success-icon">✅</div>' +
+      '<h3>¡PEDIDO REGISTRADO!</h3>' +
+      '<div class="pedido-id">#' + idPedido + '</div>' +
+      '<p style="color:var(--gray-500);font-size:13px;margin-top:8px;">Tu mercancía quedó reservada.<br>' +
+      'Completa el pago para confirmar tu pedido.</p>' +
+    '</div>' +
+    '<div style="background:linear-gradient(135deg,rgba(201,168,76,.15),rgba(201,168,76,.05));' +
+         'border:1.5px solid var(--primary);border-radius:10px;padding:16px;text-align:center;margin-bottom:16px;">' +
+      '<div style="font-size:11px;letter-spacing:3px;color:var(--gray-500);' +
+           'text-transform:uppercase;margin-bottom:4px;">Total a Pagar</div>' +
+      '<div style="font-family:var(--font-titulo);font-size:32px;font-weight:700;color:var(--primary);">$' +
+        String(parseFloat(total).toFixed(2)).replace(/\B(?=(\d{3})+(?!\d))/g, ',') +
+      '</div>' +
+    '</div>' +
+    '<button onclick="enviarWhatsAppPedido()" ' +
+      'style="width:100%;padding:14px;background:linear-gradient(135deg,#25D366,#128C7E);' +
+             'color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;' +
+             'cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;' +
+             'font-family:var(--font-body);margin-bottom:12px;">' +
+      whatsappIconSVG + ' Enviar Comprobante por WhatsApp' +
+    '</button>' +
+    (urlSeg ?
+      '<div style="background:var(--gray-100);border-radius:8px;padding:12px;margin-bottom:16px;">' +
+        '<p style="font-size:11px;color:var(--gray-500);margin-bottom:8px;' +
+             'letter-spacing:1px;text-transform:uppercase;">🔗 Tu enlace de seguimiento</p>' +
+        '<div style="display:flex;align-items:center;gap:8px;">' +
+          '<input id="linkPedido" readonly value="' + urlSeg + '" ' +
+            'style="flex:1;font-size:11px;padding:8px;border:1px solid var(--card-border);' +
+                   'border-radius:6px;background:var(--card-bg);color:var(--text);font-family:monospace;">' +
+          '<button onclick="copiarLinkPedido()" ' +
+            'style="padding:8px 12px;background:var(--primary);color:var(--secondary);border:none;' +
+                   'border-radius:6px;font-weight:700;cursor:pointer;font-size:11px;white-space:nowrap;">' +
+            'Copiar</button>' +
+        '</div>' +
+      '</div>'
+    : '') +
+    '<button class="btn-checkout" onclick="seguirComprando()">Seguir Comprando</button>';
 }
 
 // ── Pantalla de pago post-checkout ── ★ NUEVA ──────────────
