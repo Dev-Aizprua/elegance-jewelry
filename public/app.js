@@ -363,7 +363,7 @@ function mostrarPantallaPago(pedido) {
     '<div class="success-message">' +
       '<div class="success-icon">🔒</div>' +
       '<h3>¡PEDIDO REGISTRADO!</h3>' +
-      '<div class="pedido-id">#' + pedido.id + '</div>' +
+      '<div class="pedido-id">#' + pedido.id_pedido + '</div>' +
       '<p style="color:var(--gray-500);font-size:13px;margin-top:8px;">Tu mercancía quedó reservada.<br>Completa el pago para confirmar tu pedido.</p>' +
     '</div>' +
 
