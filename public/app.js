@@ -343,14 +343,36 @@ async function finalizarCompra(event) {
       itbms:      resultado.itbms
     };
 
-    mostrarPantallaPago(resultado);
+    // Mostrar pantalla de éxito — try/catch propio para no perder la confirmación
+    try {
+      mostrarPantallaPago(resultado);
+    } catch (displayError) {
+      console.error('Error en pantalla de pago:', displayError);
+      // Pantalla de éxito de emergencia si mostrarPantallaPago falla
+      document.getElementById('carritoBody').innerHTML =
+        '<div class="success-message">' +
+          '<div class="success-icon">✅</div>' +
+          '<h3>¡PEDIDO REGISTRADO!</h3>' +
+          '<div class="pedido-id">#' + (resultado.id_pedido || '') + '</div>' +
+          '<p style="color:var(--gray-500);font-size:13px;margin-top:8px;">Tu mercancía quedó reservada.<br>' +
+          'Total: $' + (resultado.total || '0.00') + '</p>' +
+        '</div>' +
+        '<div class="whatsapp-section">' +
+          '<h4>📱 Enviar Comprobante</h4>' +
+          '<p>Guarda este enlace para ver tu pedido:</p>' +
+          '<p style="word-break:break-all;font-size:11px;color:var(--primary);">' + (resultado.url_seguimiento || '') + '</p>' +
+        '</div>' +
+        '<button class="btn-checkout" onclick="seguirComprando()">Seguir Comprando</button>';
+    }
     carrito = [];
     actualizarContadorCarrito();
   } catch (error) {
+    console.error('❌ Error en finalizarCompra:', error);
+    console.error('Stack:', error.stack);
     if (error.message.includes('AGOTADO') || error.message.includes('disponible')) {
       alert('⚠️ Error de stock:\n\n' + error.message);
     } else {
-      alert('❌ Error al procesar el pedido:\n\n' + error.message);
+      alert('❌ Error al procesar el pedido:\n\n' + error.message + '\n\n(Ver consola para detalles)');
     }
     btnSubmit.disabled = false;
     btnSubmit.textContent = 'Finalizar Compra';
