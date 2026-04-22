@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mi Pedido — Elegance Jewelry</title>
+  <link rel="stylesheet" href="tema.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: var(--font-body); background: var(--body-bg); color: var(--text); min-height: 100vh; }
+
+    .pago-header { background: var(--header-bg); padding: 16px 20px; display: flex; align-items: center; gap: 14px; border-bottom: 1px solid var(--card-border); }
+    .pago-header h1 { font-family: var(--font-titulo); font-size: 20px; letter-spacing: 3px; background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .pago-header span { font-size: 10px; color: var(--gray-500); letter-spacing: 2px; text-transform: uppercase; display: block; margin-top: 2px; }
+
+    .loading-state { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; gap: 20px; }
+    .spinner-ring { width: 48px; height: 48px; position: relative; }
+    .spinner-ring::before, .spinner-ring::after { content: ''; position: absolute; inset: 0; border-radius: 50%; border: 2px solid transparent; }
+    .spinner-ring::before { border-top-color: var(--primary); animation: spin 1s linear infinite; }
+    .spinner-ring::after  { border-bottom-color: var(--accent); animation: spin 1.5s linear infinite reverse; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-txt { font-size: 11px; letter-spacing: 3px; color: var(--primary); text-transform: uppercase; }
+
+    .estado-banner { padding: 14px 20px; display: flex; align-items: center; gap: 12px; font-weight: 600; font-size: 14px; letter-spacing: 1px; }
+    .estado-banner.pendiente { background: linear-gradient(135deg, #7a5c00, #5c4400); border-bottom: 2px solid #D4AF37; color: #FFD966; }
+    .estado-banner.aprobado  { background: linear-gradient(135deg, #1a4d1a, #0d3d0d); border-bottom: 2px solid #2E7D32; color: #66BB6A; }
+    .estado-banner.cancelado { background: linear-gradient(135deg, #4d1a1a, #3d0d0d); border-bottom: 2px solid #C62828; color: #EF9A9A; }
+    .estado-banner .pulse { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; animation: pulse 1.5s ease-in-out infinite; }
+    .pendiente .pulse { background: #FFD966; }
+    .aprobado  .pulse { background: #66BB6A; animation: none; }
+    .cancelado .pulse { background: #EF9A9A; animation: none; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1);}50%{opacity:.5;transform:scale(.8);} }
+
+    .pago-container { max-width: 600px; margin: 0 auto; padding: 20px 16px 60px; }
+
+    .card-base { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; overflow: hidden; margin-bottom: 16px; }
+    .card-head { padding: 14px 20px; background: rgba(201,168,76,0.07); border-bottom: 1px solid var(--card-border); display: flex; justify-content: space-between; align-items: center; }
+    .card-head-title { font-weight: 700; font-size: 13px; letter-spacing: 2px; text-transform: uppercase; color: var(--primary); display: flex; align-items: center; gap: 8px; }
+    .card-body { padding: 16px 20px; }
+
+    .pedido-id { font-family: var(--font-titulo); font-size: 20px; color: var(--primary); font-weight: 700; letter-spacing: 2px; }
+    .pedido-fecha { font-size: 12px; color: var(--gray-500); margin-top: 2px; }
+    .estado-pill { padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; letter-spacing: 1px; }
+    .pill-pendiente { background: rgba(212,175,55,.15); color: #D4AF37; border: 1px solid #D4AF37; }
+    .pill-aprobado  { background: rgba(46,125,50,.15);  color: #66BB6A; border: 1px solid #2E7D32; }
+    .pill-cancelado { background: rgba(198,40,40,.15);  color: #EF9A9A; border: 1px solid #C62828; }
+
+    .info-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--gray-500); margin-bottom: 6px; }
+    .info-row i { color: var(--primary); width: 16px; }
+    .info-row span { color: var(--text); }
+
+    .prod-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+    .prod-item { display: flex; gap: 12px; align-items: center; padding: 10px; background: var(--gray-100); border-radius: 8px; }
+    .prod-img { width: 52px; height: 52px; object-fit: cover; border-radius: 6px; border: 1px solid var(--card-border); flex-shrink: 0; }
+    .prod-info { flex: 1; min-width: 0; }
+    .prod-nombre { font-weight: 600; font-size: 14px; color: var(--text); }
+    .prod-detalle { font-size: 12px; color: var(--gray-500); margin-top: 2px; }
+    .prod-precio { font-weight: 700; color: var(--primary); font-size: 15px; white-space: nowrap; }
+
+    .totales-box { border-top: 1px solid var(--card-border); padding-top: 14px; }
+    .total-row { display: flex; justify-content: space-between; font-size: 13px; color: var(--gray-500); margin-bottom: 6px; }
+    .total-row.final { font-size: 18px; font-weight: 700; color: var(--text); margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--card-border); }
+    .total-row.final span:last-child { color: var(--primary); }
+
+    .monto-box { background: linear-gradient(135deg,rgba(201,168,76,.15),rgba(201,168,76,.05)); border: 1.5px solid var(--primary); border-radius: 10px; padding: 16px; text-align: center; margin-bottom: 16px; }
+    .monto-label { font-size: 11px; letter-spacing: 3px; color: var(--gray-500); text-transform: uppercase; }
+    .monto-valor { font-family: var(--font-titulo); font-size: 36px; font-weight: 700; color: var(--primary); line-height: 1.1; margin: 6px 0 2px; }
+    .monto-nota  { font-size: 11px; color: var(--gray-500); }
+
+    .metodo { display: flex; gap: 14px; align-items: flex-start; padding: 14px; border-radius: 8px; border: 1px solid var(--card-border); background: var(--gray-100); margin-bottom: 12px; }
+    .metodo:last-child { margin-bottom: 0; }
+    .metodo-logo { width: 48px; height: 48px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; background: var(--secondary); color: var(--primary); border: 1px solid var(--card-border); }
+    .metodo-info h4 { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+    .metodo-dato { font-size: 13px; color: var(--gray-500); margin-bottom: 3px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .metodo-dato strong { color: var(--text); font-weight: 600; }
+    .copy-btn { background: none; border: 1px solid var(--primary-glow); cursor: pointer; color: var(--primary); font-size: 11px; padding: 2px 8px; border-radius: 4px; transition: all .2s; font-family: var(--font-body); }
+    .copy-btn:hover { background: var(--primary-glow); }
+
+    .btn-wa { width: 100%; padding: 16px; background: linear-gradient(135deg,#25D366,#128C7E); color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; letter-spacing: 1px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all .25s; margin-bottom: 12px; font-family: var(--font-body); }
+    .btn-wa:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(37,211,102,.35); }
+    .btn-wa svg { width: 22px; height: 22px; flex-shrink: 0; }
+
+    .badge-aprobado { background: linear-gradient(135deg,#2E7D32,#1a5c1a); border-radius: 8px; padding: 14px 20px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; }
+    .badge-aprobado i  { font-size: 24px; color: #66BB6A; }
+    .badge-aprobado h4 { color: #66BB6A; font-size: 14px; font-weight: 700; }
+    .badge-aprobado p  { color: #a5d6a7; font-size: 12px; margin-top: 3px; }
+    .badge-cancelado   { background: linear-gradient(135deg,#4d1a1a,#3d0d0d); border-radius: 8px; padding: 14px 20px; margin-bottom: 16px; border: 1px solid #C62828; }
+    .badge-cancelado p { color: #EF9A9A; font-size: 13px; }
+
+    .pasos-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 16px 20px; margin-bottom: 16px; }
+    .pasos-card h4 { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: var(--primary); margin-bottom: 12px; }
+    .paso { display: flex; gap: 12px; margin-bottom: 10px; align-items: flex-start; }
+    .paso-num { width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0; background: var(--primary); color: var(--secondary); font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+    .paso p { font-size: 13px; color: var(--gray-500); line-height: 1.5; }
+    .paso p strong { color: var(--text); }
+
+    .error-state { text-align: center; padding: 60px 20px; }
+    .error-state i { font-size: 48px; color: var(--danger); margin-bottom: 16px; display: block; }
+    .error-state h3 { font-size: 20px; margin-bottom: 8px; }
+    .error-state p  { font-size: 14px; color: var(--gray-500); }
+
+    @media (max-width: 380px) { .monto-valor{font-size:28px;} .pedido-id{font-size:16px;} }
+  </style>
+</head>
+<body>
+
+  <header class="pago-header">
+    <div>
+      <h1>Elegance Jewelry</h1>
+      <span>Donde cada pieza cuenta una historia</span>
+    </div>
+  </header>
+
+  <div id="estadoBanner"></div>
+  <div class="pago-container">
+    <div id="contenido">
+      <div class="loading-state">
+        <div class="spinner-ring"></div>
+        <p class="loading-txt">Cargando pedido...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════
+       ★ EDITAR AQUÍ: tus datos de pago reales ★
+       ════════════════════════════════════════════════ -->
+  <script>
+  const PAGO = {
+    whatsapp: '50764230862',        // ← número real de Elegance
+    yappy: {
+      numero: '6016-4559',          // ← número Yappy real
+      nombre: 'Elegance Jewelry',
+    },
+    banco: {
+      nombre_banco:   'Banco Nacional de Panamá',
+      numero_cuenta:  '04-23-01-123456-7',
+      nombre_titular: 'Elegance Jewelry S.A.',
+      tipo_cuenta:    'Cuenta Corriente',
+    },
+  };
+  </script>
+
+  <script>
+  const urlParams = new URLSearchParams(window.location.search);
+  const ID_PEDIDO = urlParams.get('id');
+  const KEY       = urlParams.get('key');
+
+  function fmt(n) {
+    return parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  async function copiar(texto, btn) {
+    try { await navigator.clipboard.writeText(texto); }
+    catch(e) {
+      const t = document.createElement('textarea');
+      t.value = texto; document.body.appendChild(t); t.select();
+      document.execCommand('copy'); document.body.removeChild(t);
+    }
+    const orig = btn.textContent;
+    btn.textContent = '✓ Copiado';
+    setTimeout(() => btn.textContent = orig, 1500);
+  }
+
+  async function cargarPedido() {
+    if (!ID_PEDIDO) { mostrarError('No se especificó un pedido.'); return; }
+    try {
+      const p = new URLSearchParams({ id: ID_PEDIDO });
+      if (KEY) p.set('key', KEY);
+      const res  = await fetch(`/api/pedidos?${p}`);
+      const data = await res.json();
+      if (!data.success) { mostrarError(data.error || 'Pedido no encontrado.'); return; }
+      renderizar(data.pedido, data.detalle || []);
+    } catch(e) {
+      mostrarError('Error de conexión. Intenta de nuevo.');
+    }
+  }
+
+  function renderizarBanner(estado) {
+    const el  = document.getElementById('estadoBanner');
+    const cfg = {
+      'Pendiente de Pago': { cls:'pendiente', emoji:'⏳', txt:'Esperando validación de pago — Tu mercancía está reservada' },
+      'Pendiente':         { cls:'pendiente', emoji:'⏳', txt:'Esperando validación de pago — Tu mercancía está reservada' },
+      'Aprobado':          { cls:'aprobado',  emoji:'✅', txt:'¡Pago confirmado! Tu pedido está en proceso' },
+      'Entregado':         { cls:'aprobado',  emoji:'🎁', txt:'¡Pedido entregado! Gracias por tu compra' },
+      'Cancelado':         { cls:'cancelado', emoji:'❌', txt:'Este pedido fue cancelado' },
+    };
+    const c = cfg[estado] || cfg['Pendiente de Pago'];
+    el.innerHTML = `
+      <div class="estado-banner ${c.cls}">
+        <div class="pulse"></div>
+        <span>${c.emoji}</span>
+        <span>${c.txt}</span>
+      </div>`;
+  }
+
+  function pillCls(estado) {
+    if (estado === 'Aprobado' || estado === 'Entregado') return 'pill-aprobado';
+    if (estado === 'Cancelado') return 'pill-cancelado';
+    return 'pill-pendiente';
+  }
+
+  const FB_IMG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='52' height='52'%3E%3Crect fill='%23f5f0e8' width='52' height='52'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23C9A84C' font-size='26'%3E%F0%9F%92%8D%3C/text%3E%3C/svg%3E";
+
+  function renderizar(pedido, detalle) {
+    const estado = pedido.estado || 'Pendiente de Pago';
+    renderizarBanner(estado);
+
+    const esPendiente = estado === 'Pendiente de Pago' || estado === 'Pendiente';
+    const esAprobado  = estado === 'Aprobado' || estado === 'Entregado';
+    const esCancelado = estado === 'Cancelado';
+
+    let subtotal = 0, itbmsTotal = 0;
+    detalle.forEach(d => {
+      subtotal   += parseFloat(d.precio_base  || 0) * d.cantidad;
+      itbmsTotal += parseFloat(d.itbms_monto  || 0) * d.cantidad;
+    });
+    const total = parseFloat(pedido.total) || (subtotal + itbmsTotal);
+
+    const productosHTML = detalle.map(d => `
+      <div class="prod-item">
+        <img class="prod-img" src="${d.imagen_url || FB_IMG}" onerror="this.src='${FB_IMG}'" alt="${d.nombre_producto}">
+        <div class="prod-info">
+          <div class="prod-nombre">${d.nombre_producto}</div>
+          <div class="prod-detalle">
+            Cantidad: ${d.cantidad} · Base: $${fmt(parseFloat(d.precio_base) * d.cantidad)}
+            ${parseFloat(d.itbms_monto) > 0 ? ` · ITBMS: $${fmt(parseFloat(d.itbms_monto) * d.cantidad)}` : ' · Exento'}
+          </div>
+        </div>
+        <div class="prod-precio">$${fmt(parseFloat(d.precio_final) * d.cantidad)}</div>
+      </div>`).join('');
+
+    const clienteHTML = `
+      <div class="info-row"><i class="fas fa-user"></i><span>${pedido.cliente_nombre || ''}</span></div>
+      ${pedido.cliente_email ? `<div class="info-row"><i class="fas fa-envelope"></i><span>${pedido.cliente_email}</span></div>` : ''}
+      ${pedido.cliente_tel   ? `<div class="info-row"><i class="fas fa-phone"></i><span>${pedido.cliente_tel}</span></div>` : ''}
+      ${pedido.direccion     ? `<div class="info-row"><i class="fas fa-map-marker-alt"></i><span>${pedido.direccion}</span></div>` : ''}`;
+
+    const seccionPago = esPendiente ? `
+      <div class="monto-box">
+        <div class="monto-label">Total a Pagar</div>
+        <div class="monto-valor">$${fmt(total)}</div>
+        <div class="monto-nota">Pedido #${pedido.id_pedido} · Incluye ITBMS</div>
+      </div>
+      <div class="card-base">
+        <div class="card-head">
+          <span class="card-head-title"><i class="fas fa-credit-card"></i> Métodos de Pago</span>
+        </div>
+        <div class="card-body">
+          <div class="metodo">
+            <div class="metodo-logo" style="background:#6C1D45;color:#fff;font-size:13px;font-weight:800;letter-spacing:1px;">YAPPY</div>
+            <div class="metodo-info">
+              <h4>Pago con Yappy</h4>
+              <div class="metodo-dato">
+                <i class="fas fa-mobile-alt" style="color:var(--primary);width:14px;"></i>
+                <strong>${PAGO.yappy.numero}</strong>
+                <button class="copy-btn" onclick="copiar('${PAGO.yappy.numero}',this)">Copiar</button>
+              </div>
+              <div class="metodo-dato">
+                <i class="fas fa-user" style="color:var(--primary);width:14px;"></i>
+                <span>${PAGO.yappy.nombre}</span>
+              </div>
+              <div class="metodo-dato" style="margin-top:4px;font-size:11px;">
+                ⚡ Abre tu app bancaria → Yappy → envía al número exacto
+              </div>
+            </div>
+          </div>
+          <div class="metodo">
+            <div class="metodo-logo"><i class="fas fa-university"></i></div>
+            <div class="metodo-info">
+              <h4>Transferencia Bancaria</h4>
+              <div class="metodo-dato">
+                <i class="fas fa-building" style="color:var(--primary);width:14px;"></i>
+                <strong>${PAGO.banco.nombre_banco}</strong>
+              </div>
+              <div class="metodo-dato">
+                <i class="fas fa-hashtag" style="color:var(--primary);width:14px;"></i>
+                <strong>${PAGO.banco.numero_cuenta}</strong>
+                <button class="copy-btn" onclick="copiar('${PAGO.banco.numero_cuenta}',this)">Copiar</button>
+              </div>
+              <div class="metodo-dato">
+                <i class="fas fa-user" style="color:var(--primary);width:14px;"></i>
+                <span>${PAGO.banco.nombre_titular} · ${PAGO.banco.tipo_cuenta}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button class="btn-wa" onclick="enviarWA()">
+        <svg viewBox="0 0 32 32" fill="currentColor"><path d="M16 0C7.163 0 0 7.163 0 16c0 2.825.737 5.607 2.137 8.048L0 32l7.933-2.127A15.93 15.93 0 0016 32c8.837 0 16-7.163 16-16S24.837 0 16 0zm0 29.467a13.74 13.74 0 01-7.07-1.87l-.507-.292-5.245 1.407 1.417-5.268-.321-.525A13.707 13.707 0 012.24 16C2.24 8.415 8.415 2.24 16 2.24c7.585 0 13.757 6.175 13.757 13.76 0 7.585-6.172 13.467-13.757 13.467zm7.314-10.048c-.411-.205-2.432-1.201-2.809-1.339s-.651-.205-.925.205c-.274.411-1.061 1.339-1.301 1.613s-.479.308-.89.103c-.411-.205-1.735-.641-3.304-2.041-1.221-1.091-2.046-2.439-2.286-2.85s-.026-.632.18-.837c.185-.185.411-.479.616-.719s.274-.411.411-.685.068-.514-.034-.719c-.103-.205-.925-2.229-1.268-3.053-.334-.802-.673-.693-.925-.706-.239-.012-.514-.015-.788-.015s-.719.103-1.096.514c-.377.411-1.441 1.407-1.441 3.433s1.475 3.983 1.681 4.257c.205.274 2.906 4.435 7.04 6.218.983.425 1.751.679 2.349.87.994.315 1.898.271 2.614.164.798-.119 2.432-.993 2.776-1.952s.342-1.782.239-1.952c-.103-.171-.377-.274-.788-.479z"/></svg>
+        Enviar Comprobante por WhatsApp
+      </button>
+      <div class="pasos-card">
+        <h4><i class="fas fa-info-circle"></i> ¿Cómo completar tu pago?</h4>
+        <div class="paso"><div class="paso-num">1</div><p>Realiza el pago por <strong>Yappy o transferencia</strong> por el monto exacto.</p></div>
+        <div class="paso"><div class="paso-num">2</div><p>Toma una <strong>captura de pantalla</strong> del comprobante.</p></div>
+        <div class="paso"><div class="paso-num">3</div><p>Presiona el botón verde — WhatsApp se abre con el mensaje listo. Solo <strong>adjunta la foto</strong>.</p></div>
+        <div class="paso"><div class="paso-num">4</div><p>Cuando verifiquemos el pago, esta página cambiará a <strong>verde automáticamente</strong>. Guarda este enlace.</p></div>
+      </div>` : '';
+
+    const badgeAprobado = esAprobado ? `
+      <div class="badge-aprobado">
+        <i class="fas fa-check-circle"></i>
+        <div><h4>¡Pago Verificado y Confirmado!</h4><p>Tu pedido está siendo procesado. Te contactaremos para coordinar la entrega.</p></div>
+      </div>` : '';
+
+    const badgeCancelado = esCancelado ? `
+      <div class="badge-cancelado">
+        <p><i class="fas fa-times-circle" style="margin-right:8px;"></i>Este pedido fue cancelado. Si tienes dudas contáctanos por WhatsApp.</p>
+      </div>` : '';
+
+    document.getElementById('contenido').innerHTML = `
+      ${badgeAprobado}${badgeCancelado}
+      <div class="card-base">
+        <div class="card-head">
+          <div>
+            <div class="pedido-id">#${pedido.id_pedido}</div>
+            <div class="pedido-fecha"><i class="fas fa-calendar-alt" style="margin-right:4px;color:var(--primary);"></i>${pedido.fecha || ''}</div>
+          </div>
+          <span class="estado-pill ${pillCls(estado)}">${estado}</span>
+        </div>
+        <div class="card-body">
+          <div style="margin-bottom:14px;">${clienteHTML}</div>
+          <div class="prod-list">${productosHTML}</div>
+          <div class="totales-box">
+            <div class="total-row"><span>Subtotal</span><span>$${fmt(pedido.subtotal || subtotal)}</span></div>
+            <div class="total-row"><span>ITBMS</span><span>$${fmt(pedido.itbms_total || itbmsTotal)}</span></div>
+            <div class="total-row final"><span>Total</span><span>$${fmt(total)}</span></div>
+          </div>
+        </div>
+      </div>
+      ${seccionPago}`;
+
+    window._pedido  = pedido;
+    window._detalle = detalle;
+    window._total   = total;
+  }
+
+  function enviarWA() {
+    const p   = window._pedido;
+    const det = window._detalle || [];
+    const tot = window._total   || 0;
+    let msg  = `¡Hola! Adjunto comprobante del Pedido #${p.id_pedido}.\n`;
+    msg += `🔗 Ver mi pedido: ${window.location.href}\n\n`;
+    msg += `📋 Productos:\n`;
+    det.forEach(d => { msg += `• ${d.nombre_producto} x${d.cantidad} — $${fmt(parseFloat(d.precio_final) * d.cantidad)}\n`; });
+    msg += `\n💰 TOTAL: $${fmt(tot)}\n\nAdjunto foto del comprobante aquí abajo. ⬇️`;
+    const enc = encodeURIComponent(msg).replace(/[!'()*]/g, c => '%' + c.charCodeAt(0).toString(16));
+    window.open(`https://wa.me/${PAGO.whatsapp}?text=${enc}`, '_blank');
+  }
+
+  function mostrarError(msg) {
+    document.getElementById('estadoBanner').innerHTML = '';
+    document.getElementById('contenido').innerHTML = `
+      <div class="error-state">
+        <i class="fas fa-exclamation-triangle"></i>
+        <h3>Pedido no encontrado</h3>
+        <p>${msg}</p>
+        <p style="margin-top:12px;font-size:12px;">Verifica que el enlace sea correcto o contáctanos.</p>
+      </div>`;
+  }
+
+  cargarPedido();
+  // Auto-refresco cada 30s mientras esté pendiente
+  setInterval(() => {
+    if (document.getElementById('estadoBanner')?.querySelector('.pendiente')) cargarPedido();
+  }, 30000);
+  </script>
+</body>
+</html>

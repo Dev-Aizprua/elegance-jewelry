@@ -293,12 +293,16 @@ function irACheckout() {
     '</form>';
 }
 
+
+// ── Finalizar Compra ── ★ ACTUALIZADO ───────────────────────
 async function finalizarCompra(event) {
   event.preventDefault();
   const form = event.target;
   const datosCliente = {
-    nombre: form.nombre.value, email: form.email.value,
-    telefono: form.telefono.value, direccion: form.direccion.value
+    nombre:   form.nombre.value,
+    email:    form.email.value,
+    telefono: form.telefono.value,
+    direccion: form.direccion.value
   };
   const btnSubmit = form.querySelector('button[type="submit"]');
   btnSubmit.disabled = true;
@@ -310,23 +314,34 @@ async function finalizarCompra(event) {
       body: JSON.stringify({
         cliente: datosCliente,
         productos: carrito.map(item => ({
-          id: item.id, nombre: item.nombre, cantidad: item.cantidad,
-          precioBase: item.precioBase, itbmsPorc: item.itbmsPorc,
-          itbmsMonto: item.itbmsMonto, precioFinal: item.precioFinal
+          id:          item.id,
+          nombre:      item.nombre,
+          cantidad:    item.cantidad,
+          precioBase:  item.precioBase,
+          itbmsPorc:   item.itbmsPorc,
+          itbmsMonto:  item.itbmsMonto,
+          precioFinal: item.precioFinal
         }))
       })
     });
     const resultado = await response.json();
     if (!resultado.success) throw new Error(resultado.error || 'Error al procesar');
+
+    // ★ El nuevo pedidos.js devuelve token y url_seguimiento
     ultimoPedido = {
-      id: resultado.pedido.id, cliente: datosCliente,
-      productos: [...carrito],
-      fecha: new Date().toLocaleDateString('es-PA', { weekday:'long', year:'numeric', month:'long', day:'numeric' }),
-      hora: new Date().toLocaleTimeString('es-PA', { hour:'2-digit', minute:'2-digit' }),
-      total: resultado.pedido.total, subtotal: resultado.pedido.subtotal,
-      itbms: resultado.pedido.itbms
+      id:         resultado.id_pedido,
+      token:      resultado.token,
+      url_pedido: resultado.url_seguimiento,
+      cliente:    datosCliente,
+      productos:  [...carrito],
+      fecha:      new Date().toLocaleDateString('es-PA', { weekday:'long', year:'numeric', month:'long', day:'numeric' }),
+      hora:       new Date().toLocaleTimeString('es-PA', { hour:'2-digit', minute:'2-digit' }),
+      total:      resultado.total,
+      subtotal:   resultado.subtotal,
+      itbms:      resultado.itbms
     };
-    mostrarExito(resultado.pedido.id);
+
+    mostrarPantallaPago(resultado);
     carrito = [];
     actualizarContadorCarrito();
   } catch (error) {
@@ -340,32 +355,102 @@ async function finalizarCompra(event) {
   }
 }
 
-// ── WhatsApp ────────────────────────────────────────────────
+// ── Pantalla de pago post-checkout ── ★ NUEVA ──────────────
+function mostrarPantallaPago(pedido) {
+  const urlCompleta = pedido.url_seguimiento || (window.location.origin + '/pedido?id=' + pedido.id_pedido + '&key=' + pedido.token);
+
+  document.getElementById('carritoBody').innerHTML =
+    '<div class="success-message">' +
+      '<div class="success-icon">🔒</div>' +
+      '<h3>¡PEDIDO REGISTRADO!</h3>' +
+      '<div class="pedido-id">#' + pedido.id + '</div>' +
+      '<p style="color:var(--gray-500);font-size:13px;margin-top:8px;">Tu mercancía quedó reservada.<br>Completa el pago para confirmar tu pedido.</p>' +
+    '</div>' +
+
+    '<div style="background:linear-gradient(135deg,rgba(201,168,76,.15),rgba(201,168,76,.05));border:1.5px solid var(--primary);border-radius:10px;padding:16px;text-align:center;margin-bottom:16px;">' +
+      '<div style="font-size:11px;letter-spacing:3px;color:var(--gray-500);text-transform:uppercase;margin-bottom:4px;">Total a Pagar</div>' +
+      '<div style="font-family:var(--font-titulo);font-size:32px;font-weight:700;color:var(--primary);">$' + fmt(pedido.total) + '</div>' +
+    '</div>' +
+
+    '<a href="' + urlCompleta + '" target="_blank" ' +
+      'style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;' +
+             'padding:16px;background:var(--gradient);color:var(--secondary);border:none;' +
+             'border-radius:10px;font-size:15px;font-weight:700;letter-spacing:1px;' +
+             'text-decoration:none;margin-bottom:12px;font-family:var(--font-body);">💳 Ver Ficha de Pago →' +
+    '</a>' +
+
+    '<button onclick="enviarWhatsAppPedido()" ' +
+      'style="width:100%;padding:14px;background:linear-gradient(135deg,#25D366,#128C7E);' +
+             'color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;' +
+             'cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;' +
+             'font-family:var(--font-body);margin-bottom:12px;">' +
+      whatsappIconSVG + ' Enviar por WhatsApp' +
+    '</button>' +
+
+    '<div style="background:var(--gray-100);border-radius:8px;padding:12px;margin-bottom:16px;">' +
+      '<p style="font-size:11px;color:var(--gray-500);margin-bottom:8px;letter-spacing:1px;text-transform:uppercase;">🔗 Tu enlace de seguimiento</p>' +
+      '<div style="display:flex;align-items:center;gap:8px;">' +
+        '<input id="linkPedido" readonly value="' + urlCompleta + '" ' +
+          'style="flex:1;font-size:11px;padding:8px;border:1px solid var(--card-border);' +
+                 'border-radius:6px;background:var(--card-bg);color:var(--text);font-family:monospace;">' +
+        '<button onclick="copiarLinkPedido()" ' +
+          'style="padding:8px 12px;background:var(--primary);color:var(--secondary);border:none;' +
+                 'border-radius:6px;font-weight:700;cursor:pointer;font-size:11px;white-space:nowrap;">Copiar</button>' +
+      '</div>' +
+      '<p style="font-size:10px;color:var(--gray-500);margin-top:6px;">Guarda este enlace para ver el estado de tu pedido</p>' +
+    '</div>' +
+
+    '<button class="btn-checkout" onclick="seguirComprando()">Seguir Comprando</button>';
+}
+
+// ── Copiar link del pedido ── ★ NUEVA ───────────────────────
+function copiarLinkPedido() {
+  const input = document.getElementById('linkPedido');
+  if (!input) return;
+  try { navigator.clipboard.writeText(input.value); }
+  catch(e) { input.select(); document.execCommand('copy'); }
+  const btn = input.nextElementSibling;
+  if (btn) {
+    const orig = btn.textContent;
+    btn.textContent = '✓ Copiado';
+    setTimeout(() => btn.textContent = orig, 2000);
+  }
+}
+
+// ── WhatsApp ── ★ ACTUALIZADO (incluye link del pedido) ─────
 function codificarTextoWhatsApp(texto) {
   return encodeURIComponent(texto).replace(/[!'()*]/g, c => '%' + c.charCodeAt(0).toString(16));
 }
 
 function generarMensajeWhatsApp() {
   if (!ultimoPedido) return '';
+  const urlPedido = ultimoPedido.url_pedido
+    ? window.location.origin + ultimoPedido.url_pedido
+    : window.location.href;
+
   let subtotal = 0, totalITBMS = 0;
-  ultimoPedido.productos.forEach(i => { subtotal += i.precioBase * i.cantidad; totalITBMS += i.itbmsMonto * i.cantidad; });
+  ultimoPedido.productos.forEach(i => {
+    subtotal   += i.precioBase  * i.cantidad;
+    totalITBMS += i.itbmsMonto * i.cantidad;
+  });
   const total = subtotal + totalITBMS;
-  let msg = '=== ' + EMPRESA.nombre + ' ===\nConfirmacion de Pedido\n\n' +
-    'Pedido: ' + ultimoPedido.id +
-    '\nCliente: ' + ultimoPedido.cliente.nombre +
-    '\nEmail: ' + ultimoPedido.cliente.email +
-    '\nTelefono: ' + ultimoPedido.cliente.telefono +
-    '\nFecha: ' + ultimoPedido.fecha +
-    '\n\nDireccion:\n' + ultimoPedido.cliente.direccion +
-    '\n\n--- Productos ---\n';
+
+  let msg  = '¡Hola! Adjunto comprobante del Pedido #' + ultimoPedido.id + '.\n';
+  msg += '🔗 Ver mi pedido: ' + urlPedido + '\n\n';
+  msg += '=== ' + EMPRESA.nombre + ' ===\n';
+  msg += 'Cliente: '  + ultimoPedido.cliente.nombre   + '\n';
+  msg += 'Teléfono: ' + ultimoPedido.cliente.telefono + '\n';
+  msg += 'Fecha: '    + ultimoPedido.fecha            + '\n\n';
+  msg += '--- Productos ---\n';
   ultimoPedido.productos.forEach(i => {
     msg += '* ' + i.nombre + ' (x' + i.cantidad + ') - $' + fmt(i.precioFinal * i.cantidad) + '\n';
   });
-  msg += '\n---------------------------' +
-    '\nSubtotal: $' + fmt(subtotal) +
-    '\nITBMS: $' + fmt(totalITBMS) +
-    '\nTOTAL: $' + fmt(total) +
-    '\n---------------------------\n\n' + EMPRESA.nombre + ' - ' + EMPRESA.slogan;
+  msg += '\n---------------------------\n';
+  msg += 'Subtotal: $' + fmt(subtotal)   + '\n';
+  msg += 'ITBMS: $'    + fmt(totalITBMS) + '\n';
+  msg += 'TOTAL: $'    + fmt(total)      + '\n';
+  msg += '---------------------------\n\n';
+  msg += 'Adjunto foto del comprobante de pago aquí abajo. ⬇️';
   return codificarTextoWhatsApp(msg);
 }
 
@@ -382,24 +467,7 @@ function enviarWhatsAppPedido() {
   document.addEventListener('visibilitychange', actualizarAlRegresar);
 }
 
-// ── Éxito ───────────────────────────────────────────────────
-function mostrarExito(idPedido) {
-  document.getElementById('carritoBody').innerHTML =
-    '<div class="success-message">' +
-      '<div class="success-icon">✅</div>' +
-      '<h3>PEDIDO CONFIRMADO</h3>' +
-      '<div class="pedido-id">#' + idPedido + '</div>' +
-      '<p>Recibirás un correo con los detalles de tu compra.</p>' +
-      '<p>Nos pondremos en contacto para coordinar la entrega.</p>' +
-    '</div>' +
-    '<div class="whatsapp-section">' +
-      '<h4>📱 Guardar Comprobante</h4>' +
-      '<p>Envía el resumen de tu pedido a WhatsApp.</p>' +
-      '<button class="btn-whatsapp-pedido" onclick="enviarWhatsAppPedido()">' + whatsappIconSVG + ' Enviar por WhatsApp</button>' +
-    '</div>' +
-    '<button class="btn-checkout" onclick="seguirComprando()">Seguir Comprando</button>';
-}
-
+// ── Seguir comprando ────────────────────────────────────────
 function seguirComprando() {
   carrito = []; ultimoPedido = null;
   actualizarContadorCarrito();
