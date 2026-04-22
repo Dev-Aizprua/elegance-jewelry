@@ -176,6 +176,9 @@ export async function onRequestPost(context) {
         url_seguimiento: urlSeguimiento,
         metodo_pago,
         datos_pago: datosPago,
+        total:      total,
+        subtotal:   parseFloat(subtotal.toFixed(2)),
+        itbms:      parseFloat(itbmsTotal.toFixed(2)),
         pedido: {
           idPedido,
           total,
