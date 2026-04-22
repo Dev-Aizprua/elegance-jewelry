@@ -306,14 +306,13 @@ async function finalizarCompra(event) {
     telefono:  form.telefono.value,
     direccion: form.direccion.value
   };
+  // Guardar referencia al botón ANTES de cualquier operación asíncrona
   const btnSubmit = form.querySelector('button[type="submit"]');
   if (btnSubmit) { btnSubmit.disabled = true; btnSubmit.textContent = 'Procesando...'; }
 
   let resultado = null;
-  let paso = 'inicio';
 
   try {
-    paso = 'fetch';
     const response = await fetch('/api/pedidos', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -331,67 +330,44 @@ async function finalizarCompra(event) {
       })
     });
 
-    paso = 'json';
     resultado = await response.json();
-
-    paso = 'validar';
     if (!resultado.success) throw new Error(resultado.error || 'Error al procesar');
 
-    paso = 'fecha';
-    const fechaStr = (() => {
-      try { return new Date().toLocaleDateString('es-419', { weekday:'long', year:'numeric', month:'long', day:'numeric' }); }
-      catch(e) { return new Date().toLocaleDateString(); }
-    })();
-
-    paso = 'hora';
-    const horaStr = (() => {
-      try { return new Date().toLocaleTimeString('es-419', { hour:'2-digit', minute:'2-digit' }); }
-      catch(e) { return new Date().toLocaleTimeString(); }
-    })();
-
-    paso = 'ultimoPedido';
+    // Guardar en ultimoPedido para WhatsApp
     ultimoPedido = {
       id:         resultado.id_pedido,
       token:      resultado.token,
       url_pedido: resultado.url_seguimiento,
       cliente:    datosCliente,
       productos:  [...carrito],
-      fecha:      fechaStr,
-      hora:       horaStr,
+      fecha:      (() => { try { return new Date().toLocaleDateString('es-419', { weekday:'long', year:'numeric', month:'long', day:'numeric' }); } catch(e) { return new Date().toLocaleDateString(); } })(),
+      hora:       (() => { try { return new Date().toLocaleTimeString('es-419', { hour:'2-digit', minute:'2-digit' }); } catch(e) { return new Date().toLocaleTimeString(); } })(),
       total:      resultado.total,
       subtotal:   resultado.subtotal,
       itbms:      resultado.itbms
     };
 
-    paso = 'limpiarCarrito';
     carrito = [];
     actualizarContadorCarrito();
 
-    paso = 'mostrarPantalla';
-    mostrarExitoBasico(resultado);
+    // Mostrar pantalla de pago — si falla por cualquier razón, mostrar pantalla básica
+    try {
+      mostrarPantallaPago(resultado);
+    } catch (displayErr) {
+      console.error('Error en mostrarPantallaPago:', displayErr);
+      mostrarExitoBasico(resultado);
+    }
 
   } catch (error) {
-    console.error('Error en paso [' + paso + ']:', error);
+    console.error('Error en finalizarCompra:', error);
+    // Si el pedido YA se creó (resultado existe) pero falló algo después → mostrar éxito igual
     if (resultado && resultado.success) {
       carrito = [];
       actualizarContadorCarrito();
-      // Mostrar pantalla de emergencia con datos mínimos
-      document.getElementById('carritoBody').innerHTML =
-        '<div class="success-message">' +
-          '<div class="success-icon">✅</div>' +
-          '<h3>¡PEDIDO REGISTRADO!</h3>' +
-          '<div class="pedido-id">#' + (resultado.id_pedido || '') + '</div>' +
-          '<p style="color:var(--gray-500);font-size:13px;margin-top:8px;">Tu mercancía quedó reservada.</p>' +
-        '</div>' +
-        '<div style="background:var(--gray-100);border-radius:10px;padding:16px;margin-bottom:16px;border:1px solid var(--card-border);">' +
-          '<p style="font-size:12px;color:#c0392b;font-weight:700;">⚠️ Error interno (paso: ' + paso + ')</p>' +
-          '<p style="font-size:11px;color:var(--gray-500);margin-top:4px;word-break:break-all;">' + (error.message || 'desconocido') + '</p>' +
-          '<p style="font-size:11px;color:var(--gray-500);margin-top:8px;">Tu pedido SÍ fue registrado. Link de seguimiento:</p>' +
-          '<p style="font-size:12px;color:var(--primary);word-break:break-all;">' + (resultado.url_seguimiento || '') + '</p>' +
-        '</div>' +
-        '<button class="btn-checkout" onclick="seguirComprando()">Seguir Comprando</button>';
+      mostrarExitoBasico(resultado);
       return;
     }
+    // Si el pedido NO se creó → mostrar error
     const msg = error.message || 'Error desconocido';
     if (msg.includes('AGOTADO') || msg.includes('disponible') || msg.includes('stock')) {
       alert('⚠️ Error de stock:\n\n' + msg);
@@ -450,19 +426,22 @@ function mostrarExitoBasico(resultado) {
 
 // ── Pantalla de pago post-checkout ── ★ NUEVA ──────────────
 function mostrarPantallaPago(pedido) {
-  const urlCompleta = pedido.url_seguimiento || (window.location.origin + '/pedido?id=' + pedido.id_pedido + '&key=' + pedido.token);
+  const idPedido    = pedido.id_pedido  || '';
+  const token       = pedido.token      || '';
+  const total       = parseFloat(pedido.total || 0);
+  const urlCompleta = pedido.url_seguimiento || (window.location.origin + '/pedido?id=' + idPedido + '&key=' + token);
 
   document.getElementById('carritoBody').innerHTML =
     '<div class="success-message">' +
       '<div class="success-icon">🔒</div>' +
       '<h3>¡PEDIDO REGISTRADO!</h3>' +
-      '<div class="pedido-id">#' + pedido.id_pedido + '</div>' +
+      '<div class="pedido-id">#' + idPedido + '</div>' +
       '<p style="color:var(--gray-500);font-size:13px;margin-top:8px;">Tu mercancía quedó reservada.<br>Completa el pago para confirmar tu pedido.</p>' +
     '</div>' +
 
     '<div style="background:linear-gradient(135deg,rgba(201,168,76,.15),rgba(201,168,76,.05));border:1.5px solid var(--primary);border-radius:10px;padding:16px;text-align:center;margin-bottom:16px;">' +
       '<div style="font-size:11px;letter-spacing:3px;color:var(--gray-500);text-transform:uppercase;margin-bottom:4px;">Total a Pagar</div>' +
-      '<div style="font-family:var(--font-titulo);font-size:32px;font-weight:700;color:var(--primary);">$' + fmt(pedido.total) + '</div>' +
+      '<div style="font-family:var(--font-titulo);font-size:32px;font-weight:700;color:var(--primary);">$' + fmt(total) + '</div>' +
     '</div>' +
 
     '<a href="' + urlCompleta + '" target="_blank" ' +
@@ -517,9 +496,7 @@ function codificarTextoWhatsApp(texto) {
 
 function generarMensajeWhatsApp() {
   if (!ultimoPedido) return '';
-  const urlPedido = ultimoPedido.url_pedido
-    ? window.location.origin + ultimoPedido.url_pedido
-    : window.location.href;
+  const urlPedido = ultimoPedido.url_pedido || window.location.href;
 
   let subtotal = 0, totalITBMS = 0;
   ultimoPedido.productos.forEach(i => {
