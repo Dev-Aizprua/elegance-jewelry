@@ -41,7 +41,7 @@ export async function onRequestPost(context) {
 
   try {
     const body = await request.json();
-    const { cliente, items, metodo_pago = 'yappy' } = body;
+    const { cliente, productos: items, metodo_pago = 'yappy' } = body;
 
     // Validar campos
     if (!cliente || !items || items.length === 0) {
