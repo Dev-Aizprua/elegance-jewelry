@@ -426,19 +426,24 @@ function mostrarExitoBasico(resultado) {
 
 // ── Pantalla de pago post-checkout ── ★ NUEVA ──────────────
 function mostrarPantallaPago(pedido) {
-  const urlCompleta = pedido.url_seguimiento || (window.location.origin + '/pedido?id=' + pedido.id_pedido + '&key=' + pedido.token);
+  // Normalizar campos — el servidor puede devolverlos en la raíz o dentro de pedido.pedido
+  const idPedido    = pedido.id_pedido  || (pedido.pedido && pedido.pedido.idPedido)  || '';
+  const token       = pedido.token      || (pedido.pedido && pedido.pedido.token)      || '';
+  const total       = parseFloat(pedido.total || (pedido.pedido && pedido.pedido.total) || 0);
+  const urlSeg      = pedido.url_seguimiento || '';
+  const urlCompleta = urlSeg || (window.location.origin + '/pedido?id=' + idPedido + '&key=' + token);
 
   document.getElementById('carritoBody').innerHTML =
     '<div class="success-message">' +
       '<div class="success-icon">🔒</div>' +
       '<h3>¡PEDIDO REGISTRADO!</h3>' +
-      '<div class="pedido-id">#' + pedido.id_pedido + '</div>' +
+      '<div class="pedido-id">#' + idPedido + '</div>' +
       '<p style="color:var(--gray-500);font-size:13px;margin-top:8px;">Tu mercancía quedó reservada.<br>Completa el pago para confirmar tu pedido.</p>' +
     '</div>' +
 
     '<div style="background:linear-gradient(135deg,rgba(201,168,76,.15),rgba(201,168,76,.05));border:1.5px solid var(--primary);border-radius:10px;padding:16px;text-align:center;margin-bottom:16px;">' +
       '<div style="font-size:11px;letter-spacing:3px;color:var(--gray-500);text-transform:uppercase;margin-bottom:4px;">Total a Pagar</div>' +
-      '<div style="font-family:var(--font-titulo);font-size:32px;font-weight:700;color:var(--primary);">$' + fmt(pedido.total) + '</div>' +
+      '<div style="font-family:var(--font-titulo);font-size:32px;font-weight:700;color:var(--primary);">$' + fmt(total) + '</div>' +
     '</div>' +
 
     '<a href="' + urlCompleta + '" target="_blank" ' +
@@ -493,9 +498,8 @@ function codificarTextoWhatsApp(texto) {
 
 function generarMensajeWhatsApp() {
   if (!ultimoPedido) return '';
-  const urlPedido = ultimoPedido.url_pedido
-    ? window.location.origin + ultimoPedido.url_pedido
-    : window.location.href;
+  // url_pedido ya es una URL completa (https://...) — no concatenar origin
+  const urlPedido = ultimoPedido.url_pedido || window.location.href;
 
   let subtotal = 0, totalITBMS = 0;
   ultimoPedido.productos.forEach(i => {
