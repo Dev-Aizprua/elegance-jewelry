@@ -205,12 +205,23 @@
   const FB_IMG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='52' height='52'%3E%3Crect fill='%23f5f0e8' width='52' height='52'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23C9A84C' font-size='26'%3E%F0%9F%92%8D%3C/text%3E%3C/svg%3E";
 
   function renderizar(pedido, detalle) {
-    const estado = pedido.estado || 'Pendiente de Pago';
-    renderizarBanner(estado);
+    // estado_pago = 'pendiente'|'aprobado'|'cancelado' (del servidor)
+    // estado      = 'Pendiente'|'Entregado'|'Cancelado' (flujo de entrega)
+    const estadoPago = (pedido.estado_pago || '').toLowerCase();
+    const estadoBase = pedido.estado || 'Pendiente de Pago';
 
-    const esPendiente = estado === 'Pendiente de Pago' || estado === 'Pendiente';
-    const esAprobado  = estado === 'Aprobado' || estado === 'Entregado';
-    const esCancelado = estado === 'Cancelado';
+    // El cintillo y los badges se basan en estado_pago primero
+    let estadoVisual;
+    if (estadoPago === 'aprobado')   estadoVisual = 'Aprobado';
+    else if (estadoPago === 'cancelado') estadoVisual = 'Cancelado';
+    else if (estadoBase === 'Entregado') estadoVisual = 'Entregado';
+    else estadoVisual = 'Pendiente de Pago';
+
+    renderizarBanner(estadoVisual);
+
+    const esPendiente = estadoVisual === 'Pendiente de Pago';
+    const esAprobado  = estadoVisual === 'Aprobado' || estadoVisual === 'Entregado';
+    const esCancelado = estadoVisual === 'Cancelado';
 
     let subtotal = 0, itbmsTotal = 0;
     detalle.forEach(d => {
@@ -319,7 +330,7 @@
             <div class="pedido-id">#${pedido.id_pedido}</div>
             <div class="pedido-fecha"><i class="fas fa-calendar-alt" style="margin-right:4px;color:var(--primary);"></i>${pedido.fecha || ''}</div>
           </div>
-          <span class="estado-pill ${pillCls(estado)}">${estado}</span>
+          <span class="estado-pill ${pillCls(estadoVisual)}">${estadoVisual}</span>
         </div>
         <div class="card-body">
           <div style="margin-bottom:14px;">${clienteHTML}</div>
