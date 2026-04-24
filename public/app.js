@@ -42,12 +42,51 @@ window.onload = function() {
   }
 
   cargarProductos();
+  verificarPedidoPendiente();
 
   document.addEventListener('click', function(e) {
     const fc = document.querySelector('.filter-container');
     if (fc && !fc.contains(e.target)) cerrarFilterDropdown();
   });
 };
+
+// ── Banner de rescate — pedido pendiente en localStorage ── ★ NUEVO
+function verificarPedidoPendiente() {
+  try {
+    const raw = localStorage.getItem('pedido_pendiente');
+    if (!raw) return;
+    const datos = JSON.parse(raw);
+    if (!datos?.url_unica) return;
+    const horas = (Date.now() - (datos.timestamp || 0)) / 3600000;
+    if (horas > 24) { localStorage.removeItem('pedido_pendiente'); return; }
+
+    const el = document.createElement('div');
+    el.id = 'bannerRescate';
+    el.innerHTML =
+      '<div style="position:fixed;bottom:76px;left:50%;transform:translateX(-50%);z-index:9998;' +
+           'width:calc(100% - 24px);max-width:460px;">' +
+        '<div style="background:linear-gradient(135deg,rgba(28,26,22,.97),rgba(50,42,30,.97));' +
+             'border:1px solid var(--primary);border-radius:14px;padding:12px 14px;' +
+             'box-shadow:0 8px 32px rgba(0,0,0,.5);display:flex;align-items:center;gap:10px;">' +
+          '<div style="font-size:20px;flex-shrink:0;">🔔</div>' +
+          '<div style="flex:1;min-width:0;">' +
+            '<div style="font-size:11px;font-weight:700;color:var(--primary);letter-spacing:1px;' +
+                 'text-transform:uppercase;margin-bottom:1px;">Pedido pendiente de pago</div>' +
+            '<div style="font-size:12px;color:#c8b88a;">#' + (datos.id_pedido||'') +
+                 ' · $' + fmt(datos.total||0) + '</div>' +
+          '</div>' +
+          '<a href="' + datos.url_unica + '" target="_blank" ' +
+             'style="background:var(--gradient);color:var(--secondary);padding:7px 12px;' +
+                    'border-radius:8px;font-size:11px;font-weight:700;text-decoration:none;' +
+                    'white-space:nowrap;flex-shrink:0;">Ver recibo →</a>' +
+          '<button onclick="document.getElementById(\'bannerRescate\').remove()" ' +
+             'style="background:none;border:none;color:#888;font-size:20px;cursor:pointer;' +
+                    'padding:0 2px;line-height:1;flex-shrink:0;">×</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(el);
+  } catch(e) {}
+}
 
 // ── Productos ───────────────────────────────────────────────
 async function cargarProductos() {
@@ -338,6 +377,17 @@ async function finalizarCompra(event) {
     const _subtotal = parseFloat(resultado.subtotal ?? resultado.pedido?.subtotal ?? 0);
     const _itbms    = parseFloat(resultado.itbms    ?? resultado.pedido?.itbms    ?? 0);
 
+    // ★ PERSISTENCIA — guardar en localStorage para banner de rescate
+    try {
+      localStorage.setItem('pedido_pendiente', JSON.stringify({
+        id_pedido: resultado.id_pedido,
+        url_unica: resultado.url_seguimiento,
+        timestamp: Date.now(),
+        cliente:   datosCliente.nombre,
+        total:     _total
+      }));
+    } catch(e) { /* localStorage no disponible */ }
+
     // Guardar en ultimoPedido para WhatsApp
     ultimoPedido = {
       id:         resultado.id_pedido,
@@ -546,6 +596,7 @@ function enviarWhatsAppPedido() {
 // ── Seguir comprando ────────────────────────────────────────
 function seguirComprando() {
   carrito = []; ultimoPedido = null;
+  try { localStorage.removeItem('pedido_pendiente'); } catch(e) {}
   actualizarContadorCarrito();
   cerrarCarrito();
   document.getElementById('productosGrid').innerHTML =

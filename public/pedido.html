@@ -173,6 +173,13 @@
       const data = await res.json();
       if (!data.success) { mostrarError(data.error || 'Pedido no encontrado.'); return; }
       renderizar(data.pedido, data.pedido.detalle || []);
+
+      // ★ LIMPIEZA — si el pago está aprobado/entregado, borrar banner de rescate
+      const ep = (data.pedido.estado_pago || '').toLowerCase();
+      const es = (data.pedido.estado      || '').toLowerCase();
+      if (ep === 'aprobado' || ep === 'cancelado' || es === 'entregado') {
+        try { localStorage.removeItem('pedido_pendiente'); } catch(e) {}
+      }
     } catch(e) {
       mostrarError('Error de conexión. Intenta de nuevo.');
     }
