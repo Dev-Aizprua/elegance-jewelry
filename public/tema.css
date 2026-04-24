@@ -86,3 +86,72 @@
   --badge-color:      #060e1a;
 }
 */
+
+/* ============================================================
+   ELEGANCE JEWELRY — Botón PDF
+   Pegar en: tema.css (al final del archivo)
+   ============================================================ */
+
+.btn-pdf-elegance {
+  display:          flex;
+  align-items:      center;
+  justify-content:  center;
+  width:            100%;
+  padding:          13px 20px;
+  margin-bottom:    12px;
+  background:       transparent;
+  color:            var(--primary, #D4AF37);
+  border:           1.5px solid var(--primary, #D4AF37);
+  border-radius:    10px;
+  font-family:      var(--font-body, 'Montserrat', sans-serif);
+  font-size:        13px;
+  font-weight:      600;
+  letter-spacing:   0.5px;
+  cursor:           pointer;
+  transition:       background 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
+  text-decoration:  none;
+  gap:              6px;
+}
+
+.btn-pdf-elegance:hover {
+  background:   var(--primary, #D4AF37);
+  color:        var(--secondary, #1C1A16);
+  box-shadow:   0 4px 16px rgba(212, 175, 55, 0.35);
+}
+
+.btn-pdf-elegance:active {
+  transform:    scale(0.98);
+}
+
+/* Versión compacta para pedido.html — flotante bajo el banner */
+#btnPDF {
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  width:           calc(100% - 40px);
+  margin:          12px 20px 4px;
+  padding:         10px 16px;
+  background:      transparent;
+  color:           var(--primary, #D4AF37);
+  border:          1.5px solid var(--primary, #D4AF37);
+  border-radius:   8px;
+  font-family:     var(--font-body, 'Montserrat', sans-serif);
+  font-size:       12px;
+  font-weight:     600;
+  cursor:          pointer;
+  transition:      all 0.25s ease;
+  gap:             6px;
+  box-sizing:      border-box;
+}
+
+#btnPDF:hover {
+  background:  var(--primary, #D4AF37);
+  color:       var(--secondary, #1C1A16);
+  box-shadow:  0 4px 14px rgba(212, 175, 55, 0.3);
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .btn-pdf-elegance { font-size: 12px; padding: 11px 16px; }
+  #btnPDF           { font-size: 11px; }
+}

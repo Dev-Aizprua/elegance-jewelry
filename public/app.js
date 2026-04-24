@@ -476,6 +476,10 @@ function mostrarExitoBasico(resultado) {
         '</div>' +
       '</div>'
     : '') +
+    '<button class="btn-pdf-elegance" onclick="generarPDF(window._datosPDF)">' +
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>' +
+      'Descargar Recibo PDF' +
+    '</button>' +
     '<button class="btn-checkout" onclick="seguirComprando()">Seguir Comprando</button>';
 }
 
@@ -528,7 +532,30 @@ function mostrarPantallaPago(pedido) {
       '<p style="font-size:10px;color:var(--gray-500);margin-top:6px;">Guarda este enlace para ver el estado de tu pedido</p>' +
     '</div>' +
 
+    '<button class="btn-pdf-elegance" onclick="generarPDF(window._datosPDF)">' +
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>' +
+      'Descargar Recibo PDF' +
+    '</button>' +
     '<button class="btn-checkout" onclick="seguirComprando()">Seguir Comprando</button>';
+
+  // Guardar datos para el PDF
+  window._datosPDF = {
+    id_pedido:      pedido.id_pedido,
+    fecha:          pedido.fecha || new Date().toLocaleDateString('es-PA'),
+    cliente_nombre: ultimoPedido?.cliente?.nombre || '',
+    cliente_tel:    ultimoPedido?.cliente?.telefono || '',
+    estado_pago:    'pendiente',
+    subtotal:       pedido.subtotal,
+    itbms:          pedido.itbms,
+    total:          pedido.total,
+    detalle:        ultimoPedido?.productos?.map(p => ({
+      nombre_producto: p.nombre,
+      cantidad:        p.cantidad,
+      precio_final:    p.precioFinal,
+      precio_base:     p.precioBase,
+      itbms_monto:     p.itbmsMonto,
+    })) || [],
+  };
 }
 
 // ── Copiar link del pedido ── ★ NUEVA ───────────────────────
@@ -623,4 +650,186 @@ function ocultarCarga() {
   ['mainHeader','heroSection','filterSection','mainContent','mainFooter'].forEach(id => {
     document.getElementById(id).style.display = 'block';
   });
+}
+// ── jsPDF — Generador de recibo Elegance Jewelry ──────────────────────────
+function generarPDF(datosPedido) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const W = doc.internal.pageSize.getWidth();
+  const M = 18; // margen
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  const fmtNum = n => {
+    const v = parseFloat(n);
+    return isNaN(v) ? '0.00' : v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  // ── Paleta dorada ─────────────────────────────────────────────────────────
+  const GOLD   = [212, 175, 55];
+  const DARK   = [28,  26,  22];
+  const CREAM  = [253, 252, 249];
+  const GRAY   = [139, 115, 85];
+  const BORDER = [220, 210, 190];
+
+  // ── Cabecera ──────────────────────────────────────────────────────────────
+  doc.setFillColor(...DARK);
+  doc.rect(0, 0, W, 42, 'F');
+  doc.setFontSize(22);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...GOLD);
+  doc.text('ELEGANCE JEWELRY', W / 2, 18, { align: 'center' });
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...GOLD);
+  doc.text('Recibo de Pedido', W / 2, 26, { align: 'center' });
+
+  // Estado del pedido
+  const estadoPago = (datosPedido.estado_pago || '').toLowerCase();
+  const esAprobado = estadoPago === 'aprobado' || estadoPago === 'entregado';
+  const estadoTxt  = esAprobado ? '✓ PAGO CONFIRMADO' : '⏳ PENDIENTE DE PAGO';
+  const estadoColor = esAprobado ? [102, 187, 106] : [255, 217, 102];
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...estadoColor);
+  doc.text(estadoTxt, W / 2, 36, { align: 'center' });
+
+  let y = 52;
+
+  // ── Datos del pedido ──────────────────────────────────────────────────────
+  doc.setFillColor(...CREAM);
+  doc.rect(M, y - 4, W - M * 2, 28, 'F');
+  doc.setDrawColor(...BORDER);
+  doc.rect(M, y - 4, W - M * 2, 28, 'S');
+
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...DARK);
+  doc.text('Nº Pedido:', M + 4, y + 2);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...DARK);
+  doc.text('#' + (datosPedido.id_pedido || ''), M + 30, y + 2);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Fecha:', W / 2, y + 2);
+  doc.setFont('helvetica', 'normal');
+  doc.text(datosPedido.fecha || new Date().toLocaleDateString('es-PA'), W / 2 + 18, y + 2);
+
+  y += 8;
+  doc.setFont('helvetica', 'bold');
+  doc.text('Cliente:', M + 4, y + 2);
+  doc.setFont('helvetica', 'normal');
+  doc.text(datosPedido.cliente_nombre || '', M + 22, y + 2);
+
+  if (datosPedido.cliente_tel) {
+    y += 6;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Teléfono:', M + 4, y + 2);
+    doc.setFont('helvetica', 'normal');
+    doc.text(datosPedido.cliente_tel || '', M + 24, y + 2);
+  }
+
+  y += 18;
+
+  // ── Tabla de productos ────────────────────────────────────────────────────
+  // Encabezado
+  doc.setFillColor(...DARK);
+  doc.rect(M, y, W - M * 2, 8, 'F');
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...GOLD);
+  doc.text('Producto', M + 4, y + 5.5);
+  doc.text('Cant.', W - M - 52, y + 5.5, { align: 'center' });
+  doc.text('Precio', W - M - 30, y + 5.5, { align: 'right' });
+  doc.text('Subtotal', W - M - 4, y + 5.5, { align: 'right' });
+  y += 8;
+
+  // Filas
+  const detalle = datosPedido.detalle || [];
+  let altRow = false;
+  let subtotal = 0, itbmsTotal = 0;
+
+  detalle.forEach(d => {
+    const qty      = parseInt(d.cantidad) || 1;
+    const precio   = parseFloat(d.precio_final || d.precioFinal || 0);
+    const sub      = precio * qty;
+    const itbmsRow = parseFloat(d.itbms_monto || d.itbmsMonto || 0) * qty;
+    subtotal   += parseFloat((d.precio_base || d.precioBase || 0)) * qty;
+    itbmsTotal += itbmsRow;
+
+    if (altRow) { doc.setFillColor(248, 245, 238); } else { doc.setFillColor(...CREAM); }
+    doc.rect(M, y, W - M * 2, 8, 'F');
+    doc.setDrawColor(...BORDER);
+    doc.line(M, y + 8, W - M, y + 8);
+
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...DARK);
+
+    const nombre = d.nombre_producto || d.nombre || '';
+    const nombreTrunc = nombre.length > 38 ? nombre.substring(0, 35) + '...' : nombre;
+    doc.text(nombreTrunc, M + 4, y + 5.5);
+    doc.text(String(qty), W - M - 52, y + 5.5, { align: 'center' });
+    doc.text('$' + fmtNum(precio), W - M - 30, y + 5.5, { align: 'right' });
+    doc.setFont('helvetica', 'bold');
+    doc.text('$' + fmtNum(sub), W - M - 4, y + 5.5, { align: 'right' });
+
+    altRow = !altRow;
+    y += 8;
+  });
+
+  // ── Totales ───────────────────────────────────────────────────────────────
+  const total = parseFloat(datosPedido.total) || (subtotal + itbmsTotal);
+  y += 4;
+
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...GRAY);
+  doc.text('Subtotal:', W - M - 40, y); doc.text('$' + fmtNum(subtotal || datosPedido.subtotal), W - M - 4, y, { align: 'right' });
+  y += 6;
+  doc.text('ITBMS (7%):', W - M - 40, y); doc.text('$' + fmtNum(itbmsTotal || datosPedido.itbms_total || datosPedido.itbms), W - M - 4, y, { align: 'right' });
+  y += 2;
+  doc.setDrawColor(...GOLD);
+  doc.setLineWidth(0.5);
+  doc.line(W - M - 50, y + 2, W - M, y + 2);
+  y += 6;
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...GOLD);
+  doc.text('TOTAL:', W - M - 40, y);
+  doc.text('$' + fmtNum(total), W - M - 4, y, { align: 'right' });
+  y += 14;
+
+  // ── Métodos de pago ───────────────────────────────────────────────────────
+  doc.setFillColor(245, 240, 232);
+  doc.rect(M, y, W - M * 2, 38, 'F');
+  doc.setDrawColor(...BORDER);
+  doc.rect(M, y, W - M * 2, 38, 'S');
+
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...DARK);
+  doc.text('Instrucciones de Pago', M + 4, y + 6);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...GRAY);
+  doc.text('Yappy:  6016-4559  ·  Elegance Jewelry', M + 4, y + 14);
+  doc.text('Transferencia:  Banco Nacional  ·  Cta. 04-23-01-123456-7', M + 4, y + 20);
+  doc.text('Titular:  Elegance Jewelry S.A.', M + 4, y + 26);
+
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'italic');
+  doc.setTextColor(...GRAY);
+  doc.text('Después de realizar el pago, envíe el comprobante por WhatsApp al 6016-4559', M + 4, y + 33);
+  y += 46;
+
+  // ── Pie de página ──────────────────────────────────────────────────────────
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...GRAY);
+  doc.text('elegance-jewelry.pages.dev  ·  WhatsApp: 6016-4559', W / 2, y, { align: 'center' });
+  doc.text('Generado el ' + new Date().toLocaleDateString('es-PA', { day:'2-digit', month:'long', year:'numeric' }), W / 2, y + 5, { align: 'center' });
+
+  // ── Guardar ───────────────────────────────────────────────────────────────
+  const idPedido = datosPedido.id_pedido || 'pedido';
+  doc.save('Recibo_Elegance_' + idPedido + '.pdf');
 }
