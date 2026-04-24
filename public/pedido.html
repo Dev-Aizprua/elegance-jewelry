@@ -50,16 +50,13 @@
     .info-row i { color: var(--primary); width: 16px; }
     .info-row span { color: var(--text); }
 
-    .prod-list { display: flex; flex-direction: column; gap: 0; margin-bottom: 16px; border: 1px solid var(--card-border); border-radius: 8px; overflow: hidden; }
-    .prod-list-header { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; padding: 8px 12px; background: var(--secondary); color: var(--primary); font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
-    .prod-item { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; padding: 12px; background: var(--card-bg); border-bottom: 1px solid var(--card-border); }
-    .prod-item:last-child { border-bottom: none; }
-    .prod-img { width: 42px; height: 42px; object-fit: cover; border-radius: 6px; border: 1px solid var(--card-border); flex-shrink: 0; }
-    .prod-info { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
-    .prod-nombre { font-weight: 600; font-size: 13px; color: var(--text); }
-    .prod-detalle { font-size: 11px; color: var(--gray-500); margin-top: 2px; }
-    .prod-cant { font-size: 13px; color: var(--gray-500); text-align: center; white-space: nowrap; }
-    .prod-precio { font-weight: 700; color: var(--primary); font-size: 14px; text-align: right; white-space: nowrap; }
+    .prod-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+    .prod-item { display: flex; gap: 12px; align-items: center; padding: 10px; background: var(--gray-100); border-radius: 8px; }
+    .prod-img { width: 52px; height: 52px; object-fit: cover; border-radius: 6px; border: 1px solid var(--card-border); flex-shrink: 0; }
+    .prod-info { flex: 1; min-width: 0; }
+    .prod-nombre { font-weight: 600; font-size: 14px; color: var(--text); }
+    .prod-detalle { font-size: 12px; color: var(--gray-500); margin-top: 2px; }
+    .prod-precio { font-weight: 700; color: var(--primary); font-size: 15px; white-space: nowrap; }
 
     .totales-box { border-top: 1px solid var(--card-border); padding-top: 14px; }
     .total-row { display: flex; justify-content: space-between; font-size: 13px; color: var(--gray-500); margin-bottom: 6px; }
@@ -175,7 +172,7 @@
       const res  = await fetch(`/api/pedidos?${p}`);
       const data = await res.json();
       if (!data.success) { mostrarError(data.error || 'Pedido no encontrado.'); return; }
-      renderizar(data.pedido, data.pedido.detalle || []);
+      renderizar(data.pedido, data.detalle || []);
     } catch(e) {
       mostrarError('Error de conexión. Intenta de nuevo.');
     }
@@ -205,7 +202,22 @@
     return 'pill-pendiente';
   }
 
-  const FB_IMG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='52' height='52'%3E%3Crect fill='%23f5f0e8' width='52' height='52'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23C9A84C' font-size='26'%3E%F0%9F%92%8D%3C/text%3E%3C/svg%3E";
+  const ICONOS_CATEGORIA = {
+    'Anillos':'💍','Collares':'📿','Aretes':'✨','Pulseras':'🪬',
+    'Relojes':'⌚','Cadenas':'⛓️','Dijes':'🌟','Sets':'🎁',
+    'Celulares':'📱','Laptops':'💻','Audio':'🎧','Tablets':'📲',
+    'Gaming':'🎮','Camisas':'👔','Pantalones':'👖','Vestidos':'👗',
+    'Calzado':'👟','Bolsos':'👜','Frescos':'🥬','Lácteos':'🥛',
+    'Panadería':'🥐','Bebidas':'🥤','Carnes':'🥩','Mariscos':'🦐',
+  };
+  function iconoCategoria(categoria) {
+    return ICONOS_CATEGORIA[categoria] || '📦';
+  }
+  function svgCategoria(categoria) {
+    const emoji = iconoCategoria(categoria);
+    const enc   = encodeURIComponent(emoji);
+    return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='52' height='52'%3E%3Crect fill='%23f5f0e8' width='52' height='52' rx='6'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='26'%3E${enc}%3C/text%3E%3C/svg%3E`;
+  }
 
   function renderizar(pedido, detalle) {
     // estado_pago = 'pendiente'|'aprobado'|'cancelado' (del servidor)
@@ -233,22 +245,16 @@
     });
     const total = parseFloat(pedido.total) || (subtotal + itbmsTotal);
 
-    const productosHTML = `
-      <div class="prod-list-header">
-        <span>Producto</span>
-        <span style="text-align:center">Cant.</span>
-        <span style="text-align:right">Total</span>
-      </div>` +
-      detalle.map(d => `
+    const productosHTML = detalle.map(d => `
       <div class="prod-item">
+        <img class="prod-img" src="${d.imagen_url || svgCategoria(d.categoria)}" onerror="this.src=svgCategoria('${d.categoria || ''}')" alt="${d.nombre_producto}">
         <div class="prod-info">
-          <img class="prod-img" src="${d.imagen_url || FB_IMG}" onerror="this.src='${FB_IMG}'" alt="${d.nombre_producto}">
-          <div>
-            <div class="prod-nombre">${d.nombre_producto}</div>
-            <div class="prod-detalle">$${fmt(parseFloat(d.precio_final))} c/u${parseFloat(d.itbms_monto||0) > 0 ? ' · ITBMS incl.' : ' · Exento'}</div>
+          <div class="prod-nombre">${d.nombre_producto}</div>
+          <div class="prod-detalle">
+            Cantidad: ${d.cantidad} · Base: $${fmt(parseFloat(d.precio_base) * d.cantidad)}
+            ${parseFloat(d.itbms_monto) > 0 ? ` · ITBMS: $${fmt(parseFloat(d.itbms_monto) * d.cantidad)}` : ' · Exento'}
           </div>
         </div>
-        <div class="prod-cant">× ${d.cantidad}</div>
         <div class="prod-precio">$${fmt(parseFloat(d.precio_final) * d.cantidad)}</div>
       </div>`).join('');
 

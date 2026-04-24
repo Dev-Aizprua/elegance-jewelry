@@ -227,10 +227,12 @@ export async function onRequestGet(context) {
                'nombre_producto', dp.nombre_producto,
                'cantidad',        dp.cantidad,
                'precio_final',    dp.precio_final,
-               'subtotal',        dp.subtotal
+               'subtotal',        dp.subtotal,
+               'categoria',       pr.categoria
              )) AS detalle
       FROM pedidos p
       LEFT JOIN detalle_pedidos dp ON dp.id_pedido = p.id_pedido
+      LEFT JOIN productos pr ON pr.id = dp.id_producto
       WHERE p.id_pedido = ? AND p.token_vista = ?
       GROUP BY p.id_pedido
     `).bind(idPedido, token).first();
