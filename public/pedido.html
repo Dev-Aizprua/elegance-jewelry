@@ -369,13 +369,18 @@
 
     // Guardar datos para PDF y renderizar botón PDF
     const estadoPagoActual = (pedido.estado_pago || '').toLowerCase();
+    const estadoEntrega    = (pedido.estado      || '').toLowerCase();
 
-    // ★ LIMPIEZA — si aprobado/pagado/entregado, liberar memoria del banner
-    if (estadoPagoActual === 'aprobado' || estadoPagoActual === 'pagado' ||
-        (pedido.estado || '').toLowerCase() === 'entregado') {
+    // ★ LIMPIEZA — arreglo de estados finales que cierran el ciclo del pedido
+    const ESTADOS_FINALES = ['aprobado', 'pagado', 'cancelado', 'rechazado'];
+    if (ESTADOS_FINALES.includes(estadoPagoActual) || estadoEntrega === 'entregado') {
       try {
         localStorage.removeItem('pedido_pendiente');
-        console.log('Sistema Elegance: Memoria liberada - Pedido Finalizado');
+        console.log(
+          'Sistema Elegance: Ciclo de pedido cerrado. Estado: ' +
+          (estadoPagoActual || estadoEntrega).toUpperCase() +
+          '. Memoria liberada.'
+        );
       } catch(e) {}
     }
 
@@ -391,24 +396,26 @@
       detalle:        detalle,
     };
 
-    // Botón PDF — insertar debajo del banner de estado
-    // El texto cambia según el estado: aprobado → "PAGO CONFIRMADO"
+    // Botón PDF — texto según estado del pedido
     const esPagoConfirmado = estadoPagoActual === 'aprobado' || estadoPagoActual === 'pagado';
+    const esCancelado      = estadoPagoActual === 'cancelado' || estadoPagoActual === 'rechazado';
+    const svgDescarga      = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
     const btnPDFtexto = esPagoConfirmado
-      ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Descargar Recibo — PAGO CONFIRMADO'
-      : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Descargar Recibo PDF';
+      ? svgDescarga + 'Descargar Recibo — PAGO CONFIRMADO'
+      : esCancelado
+        ? svgDescarga + 'Descargar Recibo — PEDIDO CANCELADO'
+        : svgDescarga + 'Descargar Recibo PDF';
 
     const existente = document.getElementById('btnPDF');
     if (existente) {
-      // Actualizar texto si ya existe (recarga de página)
       existente.innerHTML = btnPDFtexto;
-      existente.onclick = () => generarPDF(window._datosPDF);
+      existente.onclick   = () => generarPDF(window._datosPDF);
     } else {
       const btnPDF = document.createElement('button');
-      btnPDF.id = 'btnPDF';
+      btnPDF.id        = 'btnPDF';
       btnPDF.className = 'btn-pdf-elegance';
       btnPDF.innerHTML = btnPDFtexto;
-      btnPDF.onclick = () => generarPDF(window._datosPDF);
+      btnPDF.onclick   = () => generarPDF(window._datosPDF);
       const banner = document.getElementById('estadoBanner');
       if (banner && banner.nextSibling) {
         banner.parentNode.insertBefore(btnPDF, banner.nextSibling);
