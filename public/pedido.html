@@ -398,11 +398,11 @@
 
     // Botón PDF — texto según estado del pedido
     const esPagoConfirmado = estadoPagoActual === 'aprobado' || estadoPagoActual === 'pagado';
-    const esCancelado      = estadoPagoActual === 'cancelado' || estadoPagoActual === 'rechazado';
+    const esPagoCancelado  = estadoPagoActual === 'cancelado' || estadoPagoActual === 'rechazado';
     const svgDescarga      = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
     const btnPDFtexto = esPagoConfirmado
       ? svgDescarga + 'Descargar Recibo — PAGO CONFIRMADO'
-      : esCancelado
+      : esPagoCancelado
         ? svgDescarga + 'Descargar Recibo — PEDIDO CANCELADO'
         : svgDescarga + 'Descargar Recibo PDF';
 
