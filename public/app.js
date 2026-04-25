@@ -56,36 +56,58 @@ function verificarPedidoPendiente() {
     const raw = localStorage.getItem('pedido_pendiente');
     if (!raw) return;
     const datos = JSON.parse(raw);
-    if (!datos?.url_unica) return;
+    if (!datos?.url_unica || !datos?.id_pedido) return;
     const horas = (Date.now() - (datos.timestamp || 0)) / 3600000;
     if (horas > 24) { localStorage.removeItem('pedido_pendiente'); return; }
 
-    const el = document.createElement('div');
-    el.id = 'bannerRescate';
-    el.innerHTML =
-      '<div style="position:fixed;bottom:76px;left:50%;transform:translateX(-50%);z-index:9998;' +
-           'width:calc(100% - 24px);max-width:460px;">' +
-        '<div style="background:linear-gradient(135deg,rgba(28,26,22,.97),rgba(50,42,30,.97));' +
-             'border:1px solid var(--primary);border-radius:14px;padding:12px 14px;' +
-             'box-shadow:0 8px 32px rgba(0,0,0,.5);display:flex;align-items:center;gap:10px;">' +
-          '<div style="font-size:20px;flex-shrink:0;">🔔</div>' +
-          '<div style="flex:1;min-width:0;">' +
-            '<div style="font-size:11px;font-weight:700;color:var(--primary);letter-spacing:1px;' +
-                 'text-transform:uppercase;margin-bottom:1px;">Pedido pendiente de pago</div>' +
-            '<div style="font-size:12px;color:#c8b88a;">#' + (datos.id_pedido||'') +
-                 ' · $' + fmt(datos.total||0) + '</div>' +
-          '</div>' +
-          '<a href="' + datos.url_unica + '" target="_blank" ' +
-             'style="background:var(--gradient);color:var(--secondary);padding:7px 12px;' +
-                    'border-radius:8px;font-size:11px;font-weight:700;text-decoration:none;' +
-                    'white-space:nowrap;flex-shrink:0;">Ver recibo →</a>' +
-          '<button onclick="document.getElementById(\'bannerRescate\').remove()" ' +
-             'style="background:none;border:none;color:#888;font-size:20px;cursor:pointer;' +
-                    'padding:0 2px;line-height:1;flex-shrink:0;">×</button>' +
-        '</div>' +
-      '</div>';
-    document.body.appendChild(el);
+    // Verificar estado actual en el servidor antes de mostrar el banner
+    fetch('/api/pedidos?id=' + encodeURIComponent(datos.id_pedido) +
+          (datos.key ? '&key=' + encodeURIComponent(datos.key) : ''))
+      .then(r => r.json())
+      .then(data => {
+        const ep = (data?.pedido?.estado_pago || '').toLowerCase();
+        const es = (data?.pedido?.estado      || '').toLowerCase();
+        // Si ya está finalizado, limpiar y no mostrar banner
+        if (ep === 'aprobado' || ep === 'cancelado' || es === 'entregado') {
+          localStorage.removeItem('pedido_pendiente');
+          return;
+        }
+        _mostrarBannerRescate(datos);
+      })
+      .catch(() => {
+        // Sin conexión — mostrar banner igual (mejor UX que no mostrar nada)
+        _mostrarBannerRescate(datos);
+      });
   } catch(e) {}
+}
+
+function _mostrarBannerRescate(datos) {
+  if (document.getElementById('bannerRescate')) return; // ya existe
+  const el = document.createElement('div');
+  el.id = 'bannerRescate';
+  el.innerHTML =
+    '<div style="position:fixed;bottom:76px;left:50%;transform:translateX(-50%);z-index:9998;' +
+         'width:calc(100% - 24px);max-width:460px;">' +
+      '<div style="background:linear-gradient(135deg,rgba(28,26,22,.97),rgba(50,42,30,.97));' +
+           'border:1px solid var(--primary);border-radius:14px;padding:12px 14px;' +
+           'box-shadow:0 8px 32px rgba(0,0,0,.5);display:flex;align-items:center;gap:10px;">' +
+        '<div style="font-size:20px;flex-shrink:0;">🔔</div>' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div style="font-size:11px;font-weight:700;color:var(--primary);letter-spacing:1px;' +
+               'text-transform:uppercase;margin-bottom:1px;">Pedido pendiente de pago</div>' +
+          '<div style="font-size:12px;color:#c8b88a;">#' + (datos.id_pedido||'') +
+               ' · $' + fmt(datos.total||0) + '</div>' +
+        '</div>' +
+        '<a href="' + datos.url_unica + '" target="_blank" ' +
+           'style="background:var(--gradient);color:var(--secondary);padding:7px 12px;' +
+                  'border-radius:8px;font-size:11px;font-weight:700;text-decoration:none;' +
+                  'white-space:nowrap;flex-shrink:0;">Ver recibo →</a>' +
+        '<button onclick="document.getElementById(\'bannerRescate\').remove()" ' +
+           'style="background:none;border:none;color:#888;font-size:20px;cursor:pointer;' +
+                  'padding:0 2px;line-height:1;flex-shrink:0;">×</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(el);
 }
 
 // ── Productos ───────────────────────────────────────────────
@@ -476,10 +498,6 @@ function mostrarExitoBasico(resultado) {
         '</div>' +
       '</div>'
     : '') +
-    '<button class="btn-pdf-elegance" onclick="generarPDF(window._datosPDF)">' +
-      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>' +
-      'Descargar Recibo PDF' +
-    '</button>' +
     '<button class="btn-checkout" onclick="seguirComprando()">Seguir Comprando</button>';
 }
 
@@ -532,30 +550,7 @@ function mostrarPantallaPago(pedido) {
       '<p style="font-size:10px;color:var(--gray-500);margin-top:6px;">Guarda este enlace para ver el estado de tu pedido</p>' +
     '</div>' +
 
-    '<button class="btn-pdf-elegance" onclick="generarPDF(window._datosPDF)">' +
-      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>' +
-      'Descargar Recibo PDF' +
-    '</button>' +
     '<button class="btn-checkout" onclick="seguirComprando()">Seguir Comprando</button>';
-
-  // Guardar datos para el PDF
-  window._datosPDF = {
-    id_pedido:      pedido.id_pedido,
-    fecha:          pedido.fecha || new Date().toLocaleDateString('es-PA'),
-    cliente_nombre: ultimoPedido?.cliente?.nombre || '',
-    cliente_tel:    ultimoPedido?.cliente?.telefono || '',
-    estado_pago:    'pendiente',
-    subtotal:       pedido.subtotal,
-    itbms:          pedido.itbms,
-    total:          pedido.total,
-    detalle:        ultimoPedido?.productos?.map(p => ({
-      nombre_producto: p.nombre,
-      cantidad:        p.cantidad,
-      precio_final:    p.precioFinal,
-      precio_base:     p.precioBase,
-      itbms_monto:     p.itbmsMonto,
-    })) || [],
-  };
 }
 
 // ── Copiar link del pedido ── ★ NUEVA ───────────────────────

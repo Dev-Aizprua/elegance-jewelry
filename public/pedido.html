@@ -369,6 +369,16 @@
 
     // Guardar datos para PDF y renderizar botón PDF
     const estadoPagoActual = (pedido.estado_pago || '').toLowerCase();
+
+    // ★ LIMPIEZA — si aprobado/pagado/entregado, liberar memoria del banner
+    if (estadoPagoActual === 'aprobado' || estadoPagoActual === 'pagado' ||
+        (pedido.estado || '').toLowerCase() === 'entregado') {
+      try {
+        localStorage.removeItem('pedido_pendiente');
+        console.log('Sistema Elegance: Memoria liberada - Pedido Finalizado');
+      } catch(e) {}
+    }
+
     window._datosPDF = {
       id_pedido:      pedido.id_pedido,
       fecha:          pedido.fecha || new Date().toLocaleDateString('es-PA'),
@@ -382,12 +392,22 @@
     };
 
     // Botón PDF — insertar debajo del banner de estado
+    // El texto cambia según el estado: aprobado → "PAGO CONFIRMADO"
+    const esPagoConfirmado = estadoPagoActual === 'aprobado' || estadoPagoActual === 'pagado';
+    const btnPDFtexto = esPagoConfirmado
+      ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Descargar Recibo — PAGO CONFIRMADO'
+      : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Descargar Recibo PDF';
+
     const existente = document.getElementById('btnPDF');
-    if (!existente) {
+    if (existente) {
+      // Actualizar texto si ya existe (recarga de página)
+      existente.innerHTML = btnPDFtexto;
+      existente.onclick = () => generarPDF(window._datosPDF);
+    } else {
       const btnPDF = document.createElement('button');
       btnPDF.id = 'btnPDF';
       btnPDF.className = 'btn-pdf-elegance';
-      btnPDF.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Descargar Recibo PDF';
+      btnPDF.innerHTML = btnPDFtexto;
       btnPDF.onclick = () => generarPDF(window._datosPDF);
       const banner = document.getElementById('estadoBanner');
       if (banner && banner.nextSibling) {
