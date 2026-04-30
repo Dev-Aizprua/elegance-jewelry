@@ -50,7 +50,7 @@ window.onload = function() {
   });
 };
 
-// ── Banner de rescate — pedido pendiente en localStorage ── ★
+// ── Banner de rescate ── ★
 function verificarPedidoPendiente() {
   try {
     const raw = localStorage.getItem('pedido_pendiente');
@@ -60,29 +60,33 @@ function verificarPedidoPendiente() {
     const horas = (Date.now() - (datos.timestamp || 0)) / 3600000;
     if (horas > 24) { localStorage.removeItem('pedido_pendiente'); return; }
 
-    // Verificar estado actual en el servidor antes de mostrar el banner
-    fetch('/api/pedidos?id=' + encodeURIComponent(datos.id_pedido) +
-          (datos.key ? '&key=' + encodeURIComponent(datos.key) : ''))
-      .then(r => r.json())
-      .then(data => {
-        const ep = (data?.pedido?.estado_pago || '').toLowerCase();
-        const es = (data?.pedido?.estado      || '').toLowerCase();
-        // Si ya está finalizado, limpiar y NO mostrar banner
-        if (ep === 'aprobado' || ep === 'cancelado' || ep === 'pagado' || es === 'entregado') {
-          localStorage.removeItem('pedido_pendiente');
-          return;
-        }
-        _mostrarBannerRescate(datos);
-      })
-      .catch(() => {
-        // Sin conexión — mostrar banner igual por seguridad
-        _mostrarBannerRescate(datos);
-      });
+    // Si tenemos url_unica (que incluye el key), verificar estado en servidor
+    // Si el fetch falla o no hay key → mostrar banner directamente por seguridad
+    const urlVerificar = datos.url_unica
+      ? '/api/pedidos?' + datos.url_unica.split('?')[1]   // extrae id=...&key=...
+      : null;
+
+    if (urlVerificar) {
+      fetch(urlVerificar)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          const ep = (data?.pedido?.estado_pago || '').toLowerCase();
+          const es = (data?.pedido?.estado      || '').toLowerCase();
+          if (ep === 'aprobado' || ep === 'cancelado' || ep === 'pagado' || es === 'entregado') {
+            localStorage.removeItem('pedido_pendiente');
+            return;
+          }
+          _mostrarBannerRescate(datos);
+        })
+        .catch(() => _mostrarBannerRescate(datos));
+    } else {
+      _mostrarBannerRescate(datos);
+    }
   } catch(e) {}
 }
 
 function _mostrarBannerRescate(datos) {
-  if (document.getElementById('bannerRescate')) return; // ya existe
+  if (document.getElementById('bannerRescate')) return;
   const el = document.createElement('div');
   el.id = 'bannerRescate';
   el.innerHTML =
