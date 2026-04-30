@@ -412,6 +412,16 @@ async function finalizarCompra(event) {
     const _subtotal = parseFloat(resultado.subtotal ?? resultado.pedido?.subtotal ?? 0);
     const _itbms    = parseFloat(resultado.itbms    ?? resultado.pedido?.itbms    ?? 0);
 
+    // ★ PERSISTENCIA — guardar en localStorage para banner de rescate
+    try {
+      localStorage.setItem('pedido_pendiente', JSON.stringify({
+        id_pedido:  resultado.id_pedido,
+        url_unica:  resultado.url_seguimiento,
+        timestamp:  Date.now(),
+        total:      _total
+      }));
+    } catch(e) { /* localStorage no disponible */ }
+
     // Guardar en ultimoPedido para WhatsApp
     ultimoPedido = {
       id:         resultado.id_pedido,
